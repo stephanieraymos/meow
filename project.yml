@@ -1,0 +1,40 @@
+name: Meowdoku
+options:
+  bundleIdPrefix: com.stephanieraymos
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  Meowdoku:
+    type: application
+    platform: iOS
+    sources:
+      - Meowdoku
+    info:
+      path: Meowdoku/App/Info.plist
+      properties:
+        CFBundleDisplayName: Meowdoku
+        CFBundleShortVersionString: "1.0"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # Supabase publishable client key + URL — injected here rather than in
+        # Swift source. All access is gated by row-level security on the server.
+        SUPABASE_URL: https://ihvljgwfslxorxsorzpi.supabase.co
+        SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodmxqZ3dmc2x4b3J4c29yenBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MDc4OTksImV4cCI6MjA5MzQ4Mzg5OX0.GHwh57fi7fQqbo08jkaVSV66bhtSpc0ztKpyBDe2Z0s
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.stephanieraymos.meowdoku
+        GENERATE_INFOPLIST_FILE: "NO"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"

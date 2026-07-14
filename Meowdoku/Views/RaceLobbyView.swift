@@ -1,0 +1,139 @@
+import SwiftUI
+
+/// Create or join a race. Once a match is created the host waits here on a shared
+/// code until the guest joins.
+struct RaceLobbyView: View {
+    @ObservedObject var store: RaceStore
+    @AppStorage("meow_player_name") private var playerName: String = ""
+    @State private var joinCode = ""
+    @State private var difficulty: Difficulty = .normal
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        ZStack {
+            MeowTheme.backdrop.ignoresSafeArea()
+            if store.phase == .waitingForOpponent {
+                waiting
+            } else {
+                form
+            }
+        }
+    }
+
+    // MARK: Create / Join form
+
+    private var form: some View {
+        ScrollView {
+            VStack(spacing: 22) {
+                VStack(spacing: 6) {
+                    Text("🐈‍⬛ 🆚 🐈")
+                        .font(.system(size: 40))
+                    Text("Race Audie")
+                        .font(.largeTitle.bold()).foregroundStyle(.white)
+                    Text("Same puzzle, two boards. First to place every cat wins.\nOne wrong cat and you're out.")
+                        .font(.callout).foregroundStyle(.white.opacity(0.75))
+                        .multilineTextAlignment(.center)
+                }
+                .padding(.top, 12)
+
+                field("Your name") {
+                    TextField("e.g. Stephanie", text: $playerName)
+                        .textInputAutocapitalization(.words)
+                        .focused($focused)
+                }
+
+                // Create
+                card {
+                    Text("Start a new race").font(.headline).foregroundStyle(.white)
+                    Picker("Difficulty", selection: $difficulty) {
+                        ForEach(Difficulty.allCases) { d in
+                            Text("\(d.title) · \(d.subtitle)").tag(d)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    Button {
+                        Task { await store.createMatch(name: playerName, size: difficulty.size) }
+                    } label: {
+                        HStack {
+                            if store.busy { ProgressView().tint(.white) }
+                            Text("Create game").bold()
+                        }.frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent).tint(.pink)
+                    .disabled(store.busy)
+                }
+
+                // Join
+                card {
+                    Text("Join with a code").font(.headline).foregroundStyle(.white)
+                    TextField("CODE", text: $joinCode)
+                        .textInputAutocapitalization(.characters)
+                        .autocorrectionDisabled()
+                        .font(.title2.monospaced())
+                        .multilineTextAlignment(.center)
+                        .padding(10)
+                        .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                        .onChange(of: joinCode) { _, v in joinCode = String(v.uppercased().prefix(6)) }
+                    Button {
+                        Task { await store.joinMatch(name: playerName, code: joinCode) }
+                    } label: {
+                        Text("Join game").bold().frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent).tint(.blue)
+                    .disabled(store.busy || joinCode.count < 3)
+                }
+
+                if let err = store.errorMessage {
+                    Text(err).font(.footnote).foregroundStyle(.yellow)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .padding()
+        }
+        .scrollDismissesKeyboard(.interactively)
+    }
+
+    // MARK: Waiting for opponent
+
+    private var waiting: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Text("Share this code with Audie")
+                .font(.headline).foregroundStyle(.white.opacity(0.85))
+            Text(store.match?.code ?? "…")
+                .font(.system(size: 64, weight: .heavy, design: .monospaced))
+                .foregroundStyle(.white)
+                .tracking(6)
+            if let code = store.match?.code {
+                ShareLink(item: "Join my Meowdoku race! Code: \(code)") {
+                    Label("Share code", systemImage: "square.and.arrow.up")
+                }.tint(.pink)
+            }
+            ProgressView("Waiting for Audie to join…")
+                .tint(.white).foregroundStyle(.white).padding(.top, 8)
+            Spacer()
+            Button("Cancel", role: .destructive) { store.leave() }
+                .buttonStyle(.bordered).tint(.white)
+        }
+        .padding()
+    }
+
+    // MARK: Bits
+
+    @ViewBuilder private func field(_ label: String, @ViewBuilder _ content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.subheadline).foregroundStyle(.white.opacity(0.8))
+            content()
+                .textFieldStyle(.plain)
+                .padding(12)
+                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                .foregroundStyle(.white)
+        }
+    }
+
+    @ViewBuilder private func card(@ViewBuilder _ content: () -> some View) -> some View {
+        VStack(spacing: 12, content: content)
+            .padding(16)
+            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+    }
+}
