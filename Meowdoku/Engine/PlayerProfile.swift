@@ -1,7 +1,22 @@
 import SwiftUI
 
+/// The syncable slice of progress (device settings like theme/palette stay local).
+struct ProgressSnapshot: Codable {
+    var levelStars: [Int: Int]
+    var levelBestTimes: [Int: Double]
+    var dailyStreak: Int
+    var dailyBestStreak: Int
+    var lastDailyKey: String?
+    var dailySolved: [String: Bool]
+    var timeAttackBest: [Int: Double]
+    var totalWins: Int
+    var totalGames: Int
+    var totalScore: Int
+}
+
 /// Local, persisted player state: campaign progress, daily streak, stats, and
-/// settings. Saved to UserDefaults as JSON.
+/// settings. Saved to UserDefaults as JSON, and (if a player identity is chosen)
+/// mirrored to Supabase so progress survives reinstalls and syncs across devices.
 @MainActor
 final class PlayerProfile: ObservableObject {
     static let shared = PlayerProfile()
@@ -190,5 +205,58 @@ final class PlayerProfile: ObservableObject {
     var paletteID: String {
         get { data.paletteID }
         set { data.paletteID = newValue }
+    }
+
+    // MARK: - Identity & cloud sync
+
+    /// The player this device is signed in as (chosen in Settings / the race
+    /// lobby). Device-local, shared with the race picker via these UserDefaults
+    /// keys. When set, progress mirrors to Supabase.
+    var playerID: String? {
+        let s = UserDefaults.standard.string(forKey: "meow_player_id")
+        return (s?.isEmpty ?? true) ? nil : s
+    }
+    var playerName: String {
+        UserDefaults.standard.string(forKey: "meow_player_name") ?? ""
+    }
+
+    func snapshot() -> ProgressSnapshot {
+        ProgressSnapshot(
+            levelStars: data.levelStars, levelBestTimes: data.levelBestTimes,
+            dailyStreak: data.dailyStreak, dailyBestStreak: data.dailyBestStreak,
+            lastDailyKey: data.lastDailyKey, dailySolved: data.dailySolved,
+            timeAttackBest: data.timeAttackBest, totalWins: data.totalWins,
+            totalGames: data.totalGames, totalScore: data.totalScore)
+    }
+
+    /// Merge cloud progress in, keeping the best of each field (never regresses).
+    func merge(_ r: ProgressSnapshot) {
+        var d = data
+        for (lvl, s) in r.levelStars { d.levelStars[lvl] = max(d.levelStars[lvl] ?? 0, s) }
+        for (lvl, t) in r.levelBestTimes { d.levelBestTimes[lvl] = min(d.levelBestTimes[lvl] ?? .greatestFiniteMagnitude, t) }
+        for (sz, t) in r.timeAttackBest { d.timeAttackBest[sz] = min(d.timeAttackBest[sz] ?? .greatestFiniteMagnitude, t) }
+        for (k, solved) in r.dailySolved { d.dailySolved[k] = (d.dailySolved[k] ?? false) || solved }
+        d.dailyStreak = max(d.dailyStreak, r.dailyStreak)
+        d.dailyBestStreak = max(d.dailyBestStreak, r.dailyBestStreak)
+        if let rk = r.lastDailyKey, rk > (d.lastDailyKey ?? "") { d.lastDailyKey = rk }
+        d.totalWins = max(d.totalWins, r.totalWins)
+        d.totalGames = max(d.totalGames, r.totalGames)
+        d.totalScore = max(d.totalScore, r.totalScore)
+        data = d
+    }
+
+    /// Pull cloud progress, merge, then push the merged result. No-op without an
+    /// identity. Safe to call often.
+    func sync() async {
+        guard let pid = playerID else { return }
+        if let remote = try? await MeowAPI.fetchProgress(playerId: pid) { merge(remote) }
+        try? await MeowAPI.pushProgress(playerId: pid, snapshot: snapshot())
+    }
+
+    func setIdentity(id: String, name: String) {
+        UserDefaults.standard.set(id, forKey: "meow_player_id")
+        UserDefaults.standard.set(name, forKey: "meow_player_name")
+        objectWillChange.send()
+        Task { await sync() }
     }
 }

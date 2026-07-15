@@ -34,7 +34,7 @@ struct RaceLobbyView: View {
                 joinCode = code
                 if !autoJoined, !playerName.isEmpty {
                     autoJoined = true
-                    await store.joinMatch(name: playerName, code: code, avatar: selectedAvatar)
+                    await store.joinMatch(name: playerName, code: code, avatar: selectedAvatar, playerId: selectedID.isEmpty ? nil : selectedID)
                 }
             }
         }
@@ -80,7 +80,7 @@ struct RaceLobbyView: View {
                     }
                     .pickerStyle(.segmented)
                     Button {
-                        Task { await store.createMatch(name: playerName, size: difficulty.size, avatar: selectedAvatar) }
+                        Task { await store.createMatch(name: playerName, size: difficulty.size, avatar: selectedAvatar, playerId: selectedID.isEmpty ? nil : selectedID) }
                     } label: {
                         HStack {
                             if store.busy { ProgressView().tint(MeowTheme.ink) }
@@ -103,7 +103,7 @@ struct RaceLobbyView: View {
                         .background(MeowTheme.ink.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
                         .onChange(of: joinCode) { _, v in joinCode = String(v.uppercased().prefix(6)) }
                     Button {
-                        Task { await store.joinMatch(name: playerName, code: joinCode, avatar: selectedAvatar) }
+                        Task { await store.joinMatch(name: playerName, code: joinCode, avatar: selectedAvatar, playerId: selectedID.isEmpty ? nil : selectedID) }
                     } label: {
                         Text("Join game").bold().frame(maxWidth: .infinity)
                     }

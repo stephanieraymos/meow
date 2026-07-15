@@ -18,6 +18,8 @@ struct Match: Codable, Identifiable, Equatable {
     var guestAlive: Bool
     var hostAvatar: String?
     var guestAvatar: String?
+    var hostId: String?
+    var guestId: String?
     var rematchOffer: String?
     var rematchRound: Int
 

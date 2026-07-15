@@ -16,7 +16,10 @@ struct MeowdokuApp: App {
                 .preferredColorScheme(profile.appearance.colorScheme)
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Reminders.refresh() }
+            if phase == .active {
+                Reminders.refresh()
+                Task { await PlayerProfile.shared.sync() }
+            }
         }
     }
 }

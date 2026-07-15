@@ -4,6 +4,8 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject private var profile = PlayerProfile.shared
     @State private var showGameCenter = false
+    @State private var players: [MeowPlayer] = []
+    @AppStorage("meow_player_id") private var selectedID: String = ""
     private let styleColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
 
     var body: some View {
@@ -11,6 +13,31 @@ struct SettingsView: View {
             MeowTheme.backdrop.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    section("You are") {
+                        if players.isEmpty {
+                            Text("Pick who you are so your progress syncs to the cloud and survives reinstalls.")
+                                .font(.caption).foregroundStyle(MeowTheme.ink.opacity(0.6))
+                        }
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 14) {
+                                ForEach(players) { p in
+                                    Button {
+                                        profile.setIdentity(id: p.id, name: p.name.split(separator: " ").first.map(String.init) ?? p.name)
+                                        selectedID = p.id
+                                        Haptics.light()
+                                    } label: {
+                                        VStack(spacing: 4) {
+                                            CachedAvatar(urlString: p.avatarUrl, name: p.name, size: 52)
+                                                .overlay(Circle().stroke(.pink, lineWidth: selectedID == p.id ? 3 : 0))
+                                            Text(p.name.split(separator: " ").first.map(String.init) ?? p.name)
+                                                .font(.caption).foregroundStyle(MeowTheme.ink.opacity(0.85))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     section("Appearance") {
                         Picker("Appearance", selection: Binding(
                             get: { profile.appearance }, set: { profile.appearance = $0 })) {
@@ -115,6 +142,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .task { if players.isEmpty { players = (try? await MeowAPI.fetchPlayers()) ?? [] } }
         .sheet(isPresented: $showGameCenter) { GameCenterDashboard().ignoresSafeArea() }
     }
 

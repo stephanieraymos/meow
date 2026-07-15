@@ -265,6 +265,7 @@ private struct GameBoardScreen: View {
         }
         gc.report(GameCenter.Achievement.firstWin)
         if session.mistakes == 0 && session.hintsUsed == 0 { gc.report(GameCenter.Achievement.flawless) }
+        Task { await profile.sync() }
     }
 
     private func recordLoss() {

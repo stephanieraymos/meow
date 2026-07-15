@@ -91,9 +91,24 @@ struct RaceGameView: View {
             won: won,
             title: won ? "You win! 🏆" : "\(displayOpp) wins",
             subtitle: subtitle(won: won),
-            accessory: rematchStatus,
+            accessory: AnyView(VStack(spacing: 10) { rivalryBadge; if let s = rematchStatus { s } }),
             buttons: rematchButtons
         )
+    }
+
+    @ViewBuilder private var rivalryBadge: some View {
+        if store.myID != nil, store.opponentID != nil, (store.rivalryMe + store.rivalryOpp) > 0 {
+            HStack(spacing: 8) {
+                Text(store.myName.isEmpty ? "You" : store.myName).foregroundStyle(.white.opacity(0.85))
+                Text("\(store.rivalryMe)").font(.title3.bold().monospacedDigit()).foregroundStyle(.pink)
+                Text("–").foregroundStyle(.white.opacity(0.5))
+                Text("\(store.rivalryOpp)").font(.title3.bold().monospacedDigit()).foregroundStyle(.cyan)
+                Text(displayOpp).foregroundStyle(.white.opacity(0.85))
+            }
+            .font(.subheadline.bold())
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(.white.opacity(0.12), in: Capsule())
+        }
     }
 
     private var rematchStatus: AnyView? {

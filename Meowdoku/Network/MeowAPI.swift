@@ -75,7 +75,7 @@ enum MeowAPI {
     }
 
     /// Host creates a match. Retries a couple of times if the random code collides.
-    static func createMatch(hostName: String, size: Int, seed: Int64, avatar: String?) async throws -> Match {
+    static func createMatch(hostName: String, size: Int, seed: Int64, avatar: String?, playerId: String?) async throws -> Match {
         for _ in 0..<4 {
             let code = randomCode()
             var body: [String: Any] = [
@@ -86,6 +86,7 @@ enum MeowAPI {
                 "host_name": hostName,
             ]
             if let avatar { body["host_avatar"] = avatar }
+            if let playerId { body["host_id"] = playerId }
             let (data, http) = try await request(
                 path: "meow_matches",
                 method: "POST",
@@ -103,13 +104,14 @@ enum MeowAPI {
 
     /// Guest joins by code. Atomically claims the empty guest slot and flips the
     /// match to `playing`. Returns the started match, or throws if not joinable.
-    static func joinMatch(code: String, guestName: String, avatar: String?) async throws -> Match {
+    static func joinMatch(code: String, guestName: String, avatar: String?, playerId: String?) async throws -> Match {
         var body: [String: Any] = [
             "guest_name": guestName,
             "status": "playing",
             "started_at": iso8601Now(),
         ]
         if let avatar { body["guest_avatar"] = avatar }
+        if let playerId { body["guest_id"] = playerId }
         let (data, http) = try await request(
             path: "meow_matches",
             method: "PATCH",
@@ -231,6 +233,44 @@ enum MeowAPI {
             throw APIError.badResponse(http.statusCode, String(data: data, encoding: .utf8) ?? "")
         }
         return try decodeRows(data).first
+    }
+
+    // MARK: - Progress sync & rivalry
+
+    static func fetchProgress(playerId: String) async throws -> ProgressSnapshot? {
+        let (data, http) = try await request(
+            path: "meow_progress", method: "GET",
+            query: [.init(name: "player_id", value: "eq.\(playerId)"),
+                    .init(name: "select", value: "data"), .init(name: "limit", value: "1")])
+        guard http.statusCode == 200 else {
+            throw APIError.badResponse(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        struct Row: Decodable { let data: ProgressSnapshot }
+        return (try? decoder.decode([Row].self, from: data))?.first?.data
+    }
+
+    static func pushProgress(playerId: String, snapshot: ProgressSnapshot) async throws {
+        let snapData = try JSONEncoder().encode(snapshot)
+        let snapObj = try JSONSerialization.jsonObject(with: snapData)
+        _ = try await request(
+            path: "meow_progress", method: "POST",
+            query: [.init(name: "on_conflict", value: "player_id")],
+            body: ["player_id": playerId, "data": snapObj, "updated_at": iso8601Now()],
+            prefer: "resolution=merge-duplicates")
+    }
+
+    /// Head-to-head wins between two players.
+    static func fetchRivalry(a: String, b: String) async throws -> (aWins: Int, bWins: Int) {
+        let (data, http) = try await request(
+            path: "meow_results", method: "GET",
+            query: [.init(name: "select", value: "winner_id"),
+                    .init(name: "or", value: "(and(host_id.eq.\(a),guest_id.eq.\(b)),and(host_id.eq.\(b),guest_id.eq.\(a)))")])
+        guard http.statusCode == 200 else {
+            throw APIError.badResponse(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        struct Row: Decodable { let winnerId: String? }
+        let rows = (try? decoder.decode([Row].self, from: data)) ?? []
+        return (rows.filter { $0.winnerId == a }.count, rows.filter { $0.winnerId == b }.count)
     }
 
     // MARK: - Helpers

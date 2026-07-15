@@ -26,6 +26,10 @@ final class RaceStore: ObservableObject {
     @Published var opponentName: String = ""
     @Published var myAvatar: String? = nil
     @Published var opponentAvatar: String? = nil
+    @Published var myID: String? = nil
+    @Published var opponentID: String? = nil
+    @Published var rivalryMe: Int = 0
+    @Published var rivalryOpp: Int = 0
     @Published var opponentProgress: Int = 0
     @Published var opponentAlive: Bool = true
     @Published var countdownValue: Int = 3
@@ -46,14 +50,15 @@ final class RaceStore: ObservableObject {
 
     // MARK: - Lobby actions
 
-    func createMatch(name: String, size: Int, avatar: String? = nil) async {
+    func createMatch(name: String, size: Int, avatar: String? = nil, playerId: String? = nil) async {
         myName = name.isEmpty ? "Player 1" : name
         myAvatar = avatar
+        myID = playerId
         role = .host
         busy = true; errorMessage = nil
         do {
             let seed = Int64.random(in: Int64.min...Int64.max)
-            match = try await MeowAPI.createMatch(hostName: myName, size: size, seed: seed, avatar: avatar)
+            match = try await MeowAPI.createMatch(hostName: myName, size: size, seed: seed, avatar: avatar, playerId: playerId)
             phase = .waitingForOpponent
             startSync()
         } catch {
@@ -62,16 +67,18 @@ final class RaceStore: ObservableObject {
         busy = false
     }
 
-    func joinMatch(name: String, code: String, avatar: String? = nil) async {
+    func joinMatch(name: String, code: String, avatar: String? = nil, playerId: String? = nil) async {
         myName = name.isEmpty ? "Player 2" : name
         myAvatar = avatar
+        myID = playerId
         role = .guest
         busy = true; errorMessage = nil
         do {
-            let m = try await MeowAPI.joinMatch(code: code.uppercased(), guestName: myName, avatar: avatar)
+            let m = try await MeowAPI.joinMatch(code: code.uppercased(), guestName: myName, avatar: avatar, playerId: playerId)
             match = m
             opponentName = m.hostName
             opponentAvatar = m.hostAvatar
+            opponentID = m.hostId
             startSync()
             beginCountdown()
         } catch {
@@ -124,12 +131,14 @@ final class RaceStore: ObservableObject {
         opponentAlive = role == .host ? fresh.guestAlive : fresh.hostAlive
 
         opponentAvatar = role == .host ? fresh.guestAvatar : fresh.hostAvatar
+        opponentID = role == .host ? fresh.guestId : fresh.hostId
 
         switch phase {
         case .waitingForOpponent:
             if fresh.statusValue == .playing, let guest = fresh.guestName {
                 opponentName = guest
                 opponentAvatar = fresh.guestAvatar
+                opponentID = fresh.guestId
                 beginCountdown()
             }
 
@@ -250,6 +259,17 @@ final class RaceStore: ObservableObject {
         self.endReason = reason
         phase = .finished
         // Realtime + backup poll stay live to catch a rematch.
+
+        // Refresh the head-to-head record (the server trigger has just logged
+        // this result). Small delay so it's committed before we read.
+        if let a = myID, let b = opponentID {
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 700_000_000)
+                if let r = try? await MeowAPI.fetchRivalry(a: a, b: b) {
+                    await MainActor.run { self?.rivalryMe = r.aWins; self?.rivalryOpp = r.bWins }
+                }
+            }
+        }
     }
 
     // MARK: - Rematch
@@ -296,6 +316,9 @@ final class RaceStore: ObservableObject {
         session = nil
         opponentName = ""
         opponentAvatar = nil
+        opponentID = nil
+        rivalryMe = 0
+        rivalryOpp = 0
         opponentProgress = 0
         opponentAlive = true
         iWon = nil
