@@ -29,11 +29,8 @@ struct ResultCard: View {
                         CelebrationCat(style: PlayerProfile.shared.catStyle)
                             .frame(width: 128, height: 128)
                     } else {
-                        Text(MeowTheme.loseGlyph)
-                            .font(.system(size: 68))
-                            .scaleEffect(bounce ? 1.0 : 0.6)
-                            .rotationEffect(.degrees(bounce ? -8 : 4))
-                            .animation(.spring(response: 0.5, dampingFraction: 0.4), value: bounce)
+                        CommiserationCat(style: PlayerProfile.shared.catStyle)
+                            .frame(width: 112, height: 112)
                     }
                 }
 

@@ -63,6 +63,35 @@ struct JumpEffect: ViewModifier {
     }
 }
 
+/// A dejected head-shake + slump for a loss.
+struct SlumpEffect: ViewModifier {
+    @State private var phase = false
+    func body(content: Content) -> some View {
+        content
+            .rotationEffect(.degrees(phase ? 6 : -6))
+            .offset(y: phase ? 3 : 0)
+            .grayscale(0.4)
+            .animation(.easeInOut(duration: 0.35).repeatCount(6, autoreverses: true), value: phase)
+            .onAppear { phase = true }
+    }
+}
+
+/// The commiseration hero for a loss — a drawn cat that shakes its head, then
+/// slumps. Same swap point as `CelebrationCat` (uses `sad_cat` if bundled).
+struct CommiserationCat: View {
+    var style: CatStyle = CatStyles.all[0]
+    var body: some View {
+        Group {
+            if UIImage(named: "sad_cat") != nil {
+                Image("sad_cat").resizable().scaledToFit()
+            } else {
+                CatFace(style: style)
+            }
+        }
+        .modifier(SlumpEffect())
+    }
+}
+
 /// The celebration hero. Uses a bundled image named "celebration_cat" if you add
 /// one to the asset catalog (a rendered/animated cat like the reference), and
 /// otherwise falls back to the drawn `CatFace`. This is the single swap point for

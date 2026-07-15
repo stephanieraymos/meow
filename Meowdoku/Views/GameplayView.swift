@@ -34,6 +34,7 @@ private struct GameBoardScreen: View {
     @ObservedObject private var profile = PlayerProfile.shared
     @State private var recorded = false
     @State private var earnedStars = 0
+    @State private var earnedScore = 0
 
     init(mode: GameMode, onReplay: @escaping () -> Void, onNext: (() -> Void)?, onExit: @escaping () -> Void) {
         self.mode = mode
@@ -184,6 +185,7 @@ private struct GameBoardScreen: View {
     private var winAccessory: some View {
         VStack(spacing: 12) {
             StarRow(stars: earnedStars)
+            Text("+\(earnedScore) points").font(.headline).foregroundStyle(.yellow)
             ShareLink(item: shareText) {
                 Label("Share result", systemImage: "square.and.arrow.up")
                     .font(.subheadline.bold())
@@ -241,6 +243,8 @@ private struct GameBoardScreen: View {
         guard !recorded else { return }
         recorded = true
         earnedStars = LevelCatalog.stars(mistakes: session.mistakes, hintsUsed: session.hintsUsed)
+        earnedScore = profile.awardScore(size: mode.size, stars: earnedStars,
+                                          seconds: session.elapsed, heartsLeft: session.heartsRemaining)
         profile.recordGame(won: true)
         let gc = GameCenter.shared
         switch mode.kind {

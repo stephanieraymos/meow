@@ -82,11 +82,16 @@ struct HomeView: View {
             Text("One cat per row, column & color. No two cats touch.")
                 .font(.footnote).foregroundStyle(MeowTheme.ink.opacity(0.7))
                 .multilineTextAlignment(.center)
-            Button { showTutorial = true } label: {
-                Label("How to play", systemImage: "questionmark.circle")
-                    .font(.footnote.bold())
+            HStack(spacing: 14) {
+                Label("\(profile.totalScore)", systemImage: "star.circle.fill")
+                    .foregroundStyle(.yellow)
+                Button { showTutorial = true } label: {
+                    Label("How to play", systemImage: "questionmark.circle")
+                }
+                .tint(MeowTheme.ink)
             }
-            .tint(MeowTheme.ink).padding(.top, 2)
+            .font(.footnote.bold())
+            .padding(.top, 2)
         }
         .padding(.top, 8)
     }

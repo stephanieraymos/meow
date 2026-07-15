@@ -16,6 +16,7 @@ final class PlayerProfile: ObservableObject {
         var timeAttackBest: [Int: Double] = [:]   // size → best seconds
         var totalWins: Int = 0
         var totalGames: Int = 0
+        var totalScore: Int = 0
         var catStyleID: String = "classic"
         var hapticsOn: Bool = true
         var soundOn: Bool = true
@@ -43,6 +44,7 @@ final class PlayerProfile: ObservableObject {
             timeAttackBest = v(.timeAttackBest, [:])
             totalWins = v(.totalWins, 0)
             totalGames = v(.totalGames, 0)
+            totalScore = v(.totalScore, 0)
             catStyleID = v(.catStyleID, "classic")
             hapticsOn = v(.hapticsOn, true)
             soundOn = v(.soundOn, true)
@@ -129,9 +131,24 @@ final class PlayerProfile: ObservableObject {
 
     var totalWins: Int { data.totalWins }
     var totalGames: Int { data.totalGames }
+    var totalScore: Int { data.totalScore }
+
     func recordGame(won: Bool) {
         data.totalGames += 1
         if won { data.totalWins += 1 }
+    }
+
+    /// Points for a solo win: bigger boards, cleaner runs, and faster solves all
+    /// score higher. Returns the points earned (also added to the total).
+    @discardableResult
+    func awardScore(size: Int, stars: Int, seconds: Double, heartsLeft: Int) -> Int {
+        let base = size * 20                    // 120 / 160 / 200
+        let star = stars * 60                   // up to 180
+        let hearts = heartsLeft * 40            // up to 120
+        let speed = max(0, 200 - Int(seconds))  // faster = more, up to 200
+        let earned = base + star + hearts + speed
+        data.totalScore += earned
+        return earned
     }
 
     // MARK: - Settings
