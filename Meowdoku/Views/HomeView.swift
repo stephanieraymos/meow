@@ -4,6 +4,7 @@ struct HomeView: View {
     @ObservedObject private var profile = PlayerProfile.shared
     @State private var difficulty: Difficulty = .normal
     @State private var route: Route?
+    @State private var showTutorial = false
 
     enum Route: Hashable, Identifiable {
         case daily, levels, race, settings
@@ -54,6 +55,8 @@ struct HomeView: View {
             .navigationDestination(item: $route) { route in destination(route) }
         }
         .tint(.white)
+        .fullScreenCover(isPresented: $showTutorial) { TutorialView() }
+        .onAppear { if !profile.tutorialSeen { showTutorial = true } }
     }
 
     @ViewBuilder
@@ -79,6 +82,11 @@ struct HomeView: View {
             Text("One cat per row, column & color. No two cats touch.")
                 .font(.footnote).foregroundStyle(.white.opacity(0.7))
                 .multilineTextAlignment(.center)
+            Button { showTutorial = true } label: {
+                Label("How to play", systemImage: "questionmark.circle")
+                    .font(.footnote.bold())
+            }
+            .tint(.white).padding(.top, 2)
         }
         .padding(.top, 8)
     }

@@ -183,6 +183,39 @@ enum MeowAPI {
         return !(try decodeRows(data).isEmpty)
     }
 
+    /// Offer a rematch (records who wants one).
+    static func offerRematch(id: String, name: String) async throws {
+        _ = try await request(
+            path: "meow_matches", method: "PATCH",
+            query: [.init(name: "id", value: "eq.\(id)")],
+            body: ["rematch_offer": name])
+    }
+
+    /// Accept/apply a rematch: reset the match to a fresh round and start playing.
+    static func applyRematch(id: String, newRound: Int) async throws -> Match? {
+        let (data, http) = try await request(
+            path: "meow_matches", method: "PATCH",
+            query: [.init(name: "id", value: "eq.\(id)")],
+            body: [
+                "rematch_round": newRound,
+                "rematch_offer": NSNull(),
+                "status": "playing",
+                "winner": NSNull(),
+                "end_reason": NSNull(),
+                "host_progress": 0,
+                "guest_progress": 0,
+                "host_alive": true,
+                "guest_alive": true,
+                "started_at": iso8601Now(),
+                "finished_at": NSNull(),
+            ],
+            prefer: "return=representation")
+        guard http.statusCode == 200 else {
+            throw APIError.badResponse(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        return try decodeRows(data).first
+    }
+
     // MARK: - Helpers
 
     /// Unambiguous code alphabet (no O/0/I/1) for easy sharing out loud.

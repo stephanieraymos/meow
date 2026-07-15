@@ -7,6 +7,7 @@ import SwiftUI
 struct BoardView: View {
     @ObservedObject var session: GameSession
     var catGlyph: String = "🐱"
+    var spotlight: GameSession.Cell? = nil
     var onSingleTap: (Int, Int) -> Void
     var onDoubleTap: (Int, Int) -> Void
     var onPaint: (Int, Int) -> Void
@@ -69,7 +70,7 @@ struct BoardView: View {
         let mark = session.mark(row: r, col: c)
         let cellID = GameSession.Cell(row: r, col: c)
         let isFault = session.faultCell == cellID
-        let isHint = session.hintCell == cellID
+        let isHint = session.hintCell == cellID || spotlight == cellID
 
         ZStack {
             Rectangle()

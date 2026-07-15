@@ -87,10 +87,31 @@ struct RaceGameView: View {
             won: won,
             title: won ? "You win! 🏆" : "\(displayOpp) wins",
             subtitle: subtitle(won: won),
-            buttons: [
-                ResultButton(title: "Back to lobby", style: .prominent, tint: .pink) { store.reset() },
-            ]
+            accessory: rematchStatus,
+            buttons: rematchButtons
         )
+    }
+
+    private var rematchStatus: AnyView? {
+        if store.rematchOffered {
+            return AnyView(Label("Waiting for \(displayOpp) to accept…", systemImage: "hourglass")
+                .font(.footnote).foregroundStyle(.white.opacity(0.85)))
+        }
+        if store.opponentWantsRematch {
+            return AnyView(Label("\(displayOpp) wants a rematch!", systemImage: "flame.fill")
+                .font(.footnote.bold()).foregroundStyle(.pink))
+        }
+        return nil
+    }
+
+    private var rematchButtons: [ResultButton] {
+        var buttons: [ResultButton] = []
+        if !store.rematchOffered {
+            let title = store.opponentWantsRematch ? "Accept rematch" : "Rematch"
+            buttons.append(ResultButton(title: title, style: .prominent, tint: .pink) { store.rematch() })
+        }
+        buttons.append(ResultButton(title: "Back to lobby", style: .bordered, tint: .white) { store.reset() })
+        return buttons
     }
 
     private func subtitle(won: Bool) -> String {

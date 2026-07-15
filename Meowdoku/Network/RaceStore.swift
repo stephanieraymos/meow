@@ -1,13 +1,17 @@
 import SwiftUI
 
 /// Drives an online race end to end: create/join → wait → countdown → play →
-/// finish. Opponent state is refreshed by polling the match row; the outcome is
+/// finish → (optional) rematch.
+///
+/// Live state arrives over a Supabase Realtime websocket (`MeowRealtime`), with a
+/// slow REST poll as a safety net and automatic re-sync on reconnect. Every
+/// update — from either transport — funnels through `ingest(_:)`. The winner is
 /// resolved atomically on the server (first to claim `winner` wins).
 @MainActor
 final class RaceStore: ObservableObject {
 
     enum Phase: Equatable {
-        case lobby            // choosing create vs join
+        case lobby
         case waitingForOpponent
         case countdown
         case playing
@@ -27,9 +31,14 @@ final class RaceStore: ObservableObject {
     @Published var endReason: String? = nil
     @Published var busy = false
     @Published var errorMessage: String?
+    @Published var rematchOffered = false
+    @Published var opponentWantsRematch = false
 
-    private var pollTask: Task<Void, Never>?
+    private let realtime = MeowRealtime()
+    private var backupPoll: Task<Void, Never>?
+    private var countdownTask: Task<Void, Never>?
     private var claimed = false
+    private var currentRound = 0
 
     var boardSize: Int { match?.size ?? 8 }
 
@@ -41,10 +50,9 @@ final class RaceStore: ObservableObject {
         busy = true; errorMessage = nil
         do {
             let seed = Int64.random(in: Int64.min...Int64.max)
-            let m = try await MeowAPI.createMatch(hostName: myName, size: size, seed: seed)
-            match = m
+            match = try await MeowAPI.createMatch(hostName: myName, size: size, seed: seed)
             phase = .waitingForOpponent
-            startLobbyPolling()
+            startSync()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -59,6 +67,7 @@ final class RaceStore: ObservableObject {
             let m = try await MeowAPI.joinMatch(code: code.uppercased(), guestName: myName)
             match = m
             opponentName = m.hostName
+            startSync()
             beginCountdown()
         } catch {
             errorMessage = error.localizedDescription
@@ -66,22 +75,85 @@ final class RaceStore: ObservableObject {
         busy = false
     }
 
-    /// Host waits here until a guest claims the open slot.
-    private func startLobbyPolling() {
-        pollTask?.cancel()
-        pollTask = Task { [weak self] in
+    // MARK: - Live sync (realtime + backup poll → ingest)
+
+    private func startSync() {
+        guard let id = match?.id else { return }
+        realtime.start(
+            matchId: id,
+            onChange: { [weak self] fresh in self?.ingest(fresh) },
+            onReconnect: { [weak self] in self?.refetch() })
+        startBackupPoll()
+    }
+
+    private func refetch() {
+        guard let id = match?.id else { return }
+        Task { [weak self] in
+            if let fresh = try? await MeowAPI.fetchMatch(id: id) {
+                await MainActor.run { self?.ingest(fresh) }
+            }
+        }
+    }
+
+    /// Slow safety-net poll in case the websocket drops entirely.
+    private func startBackupPoll() {
+        backupPoll?.cancel()
+        backupPoll = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
                 guard let self else { return }
-                guard let id = self.match?.id, self.phase == .waitingForOpponent else { return }
-                if let fresh = try? await MeowAPI.fetchMatch(id: id),
-                   fresh.statusValue == .playing, let guest = fresh.guestName {
-                    self.match = fresh
-                    self.opponentName = guest
-                    self.beginCountdown()
-                    return
+                let active = await MainActor.run { self.match != nil && self.phase != .lobby }
+                if !active { return }
+                guard let id = await MainActor.run(body: { self.match?.id }) else { return }
+                if let fresh = try? await MeowAPI.fetchMatch(id: id) {
+                    await MainActor.run { self.ingest(fresh) }
                 }
             }
+        }
+    }
+
+    /// Single entry point for every match update, regardless of transport.
+    private func ingest(_ fresh: Match) {
+        match = fresh
+        opponentProgress = role == .host ? fresh.guestProgress : fresh.hostProgress
+        opponentAlive = role == .host ? fresh.guestAlive : fresh.hostAlive
+
+        switch phase {
+        case .waitingForOpponent:
+            if fresh.statusValue == .playing, let guest = fresh.guestName {
+                opponentName = guest
+                beginCountdown()
+            }
+
+        case .countdown, .playing:
+            if fresh.statusValue == .finished, !claimed {
+                claimed = true
+                let didWin = (fresh.winner == myName)
+                if !didWin { session?.forceLose() }
+                // This branch only fires on the *opponent's* terminal action, so
+                // from our side: they either solved first (we lose) or slipped up
+                // / forfeited (we win).
+                let reason: String
+                if didWin {
+                    reason = fresh.endReason == "forfeit" ? "forfeit" : "opponent_mistake"
+                } else {
+                    reason = "opponent_solved"
+                }
+                finish(iWon: didWin, reason: reason)
+            }
+
+        case .finished:
+            if fresh.statusValue == .playing, fresh.rematchRound > currentRound {
+                beginCountdown()   // a rematch round started
+                return
+            }
+            opponentWantsRematch = (fresh.rematchOffer == opponentName && !opponentName.isEmpty)
+            if opponentWantsRematch, rematchOffered, let id = match?.id, myName < opponentName {
+                Task { [weak self] in await self?.applyRematch(round: fresh.rematchRound + 1, id: id) }
+            }
+
+        case .lobby:
+            break
         }
     }
 
@@ -89,19 +161,22 @@ final class RaceStore: ObservableObject {
 
     private func beginCountdown() {
         guard let m = match else { return }
-        // Both players generate the *same* puzzle from the shared seed.
-        let board = PuzzleGenerator.generate(seed: m.seedBits, size: m.size)
+        currentRound = m.rematchRound
+        // Both players generate the *same* puzzle from the shared per-round seed.
+        let board = PuzzleGenerator.generate(seed: m.currentSeed, size: m.size)
         session = GameSession(board: board, allowedMistakes: 1)
         opponentProgress = 0
         opponentAlive = true
         iWon = nil
         endReason = nil
         claimed = false
+        rematchOffered = false
+        opponentWantsRematch = false
         countdownValue = 3
         phase = .countdown
 
-        pollTask?.cancel()
-        pollTask = Task { [weak self] in
+        countdownTask?.cancel()
+        countdownTask = Task { [weak self] in
             for n in stride(from: 3, through: 1, by: -1) {
                 await MainActor.run { self?.countdownValue = n }
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -111,18 +186,12 @@ final class RaceStore: ObservableObject {
         }
     }
 
-    private func startPlaying() {
-        phase = .playing
-        startMatchPolling()
-    }
+    private func startPlaying() { phase = .playing }
 
     /// Handle a board tap during a race.
     func tap(row: Int, col: Int, noteMode: Bool) {
         guard phase == .playing, let session, !session.isOver else { return }
-        if noteMode {
-            session.toggleBlock(row: row, col: col)
-            return
-        }
+        if noteMode { session.toggleBlock(row: row, col: col); return }
         switch session.placeCat(row: row, col: col) {
         case .placedCorrect:
             pushProgress()
@@ -152,8 +221,7 @@ final class RaceStore: ObservableObject {
         guard let id = match?.id, !claimed else { return }
         claimed = true
         let won = (try? await MeowAPI.claimResult(
-            id: id, winnerName: myName, reason: "solved", aliveField: nil, alive: true
-        )) ?? false
+            id: id, winnerName: myName, reason: "solved", aliveField: nil, alive: true)) ?? false
         finish(iWon: won, reason: won ? "solved" : "opponent_solved")
         if !won { session?.forceLose() }
     }
@@ -161,68 +229,58 @@ final class RaceStore: ObservableObject {
     private func declareLoss() async {
         guard let id = match?.id, !claimed else { return }
         claimed = true
-        // My mistake hands the win to my opponent.
         _ = try? await MeowAPI.claimResult(
-            id: id, winnerName: opponentName, reason: "mistake",
-            aliveField: role, alive: false
-        )
+            id: id, winnerName: opponentName, reason: "mistake", aliveField: role, alive: false)
         finish(iWon: false, reason: "mistake")
     }
 
-    /// Poll the opponent's progress and detect a server-side finish.
-    private func startMatchPolling() {
-        pollTask?.cancel()
-        pollTask = Task { [weak self] in
-            while !Task.isCancelled {
-                guard let self else { return }
-                let stillPlaying = await MainActor.run { self.phase == .playing }
-                if !stillPlaying { return }
-                guard let id = await MainActor.run(body: { self.match?.id }) else { return }
+    private func finish(iWon: Bool, reason: String) {
+        countdownTask?.cancel()
+        self.iWon = iWon
+        self.endReason = reason
+        phase = .finished
+        // Realtime + backup poll stay live to catch a rematch.
+    }
 
-                if let fresh = try? await MeowAPI.fetchMatch(id: id) {
-                    await MainActor.run { self.absorb(fresh) }
-                }
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+    // MARK: - Rematch
+
+    /// Offer a rematch, or accept the opponent's standing offer.
+    func rematch() {
+        guard let id = match?.id else { return }
+        Task {
+            guard let fresh = try? await MeowAPI.fetchMatch(id: id) else { return }
+            if fresh.rematchOffer == opponentName && !opponentName.isEmpty {
+                await applyRematch(round: fresh.rematchRound + 1, id: id)
+            } else {
+                try? await MeowAPI.offerRematch(id: id, name: myName)
+                rematchOffered = true
             }
         }
     }
 
-    private func absorb(_ fresh: Match) {
-        match = fresh
-        opponentProgress = role == .host ? fresh.guestProgress : fresh.hostProgress
-        opponentAlive = role == .host ? fresh.guestAlive : fresh.hostAlive
-
-        guard phase == .playing, fresh.statusValue == .finished, !claimed else { return }
-        // Opponent ended the game first.
-        claimed = true
-        let didWin = (fresh.winner == myName)
-        if !didWin { session?.forceLose() }
-        finish(iWon: didWin, reason: didWin ? "opponent_mistake" : (fresh.endReason ?? "lost"))
-    }
-
-    private func finish(iWon: Bool, reason: String) {
-        self.iWon = iWon
-        self.endReason = reason
-        phase = .finished
-        pollTask?.cancel()
+    private func applyRematch(round: Int, id: String) async {
+        if let started = try? await MeowAPI.applyRematch(id: id, newRound: round) {
+            match = started
+            beginCountdown()
+        }
     }
 
     // MARK: - Teardown
 
     func leave() {
-        pollTask?.cancel()
-        pollTask = nil
         // Best-effort forfeit if we bail mid-game.
         if phase == .playing, let id = match?.id, !claimed {
             claimed = true
-            let opp = opponentName
-            let r = role
+            let opp = opponentName, r = role
             Task { _ = try? await MeowAPI.claimResult(id: id, winnerName: opp, reason: "forfeit", aliveField: r, alive: false) }
         }
         reset()
     }
 
     func reset() {
+        realtime.stop()
+        backupPoll?.cancel(); backupPoll = nil
+        countdownTask?.cancel(); countdownTask = nil
         phase = .lobby
         match = nil
         session = nil
@@ -232,5 +290,8 @@ final class RaceStore: ObservableObject {
         endReason = nil
         claimed = false
         errorMessage = nil
+        rematchOffered = false
+        opponentWantsRematch = false
+        currentRound = 0
     }
 }

@@ -16,11 +16,25 @@ struct Match: Codable, Identifiable, Equatable {
     var guestProgress: Int
     var hostAlive: Bool
     var guestAlive: Bool
+    var rematchOffer: String?
+    var rematchRound: Int
 
     enum Status: String { case waiting, playing, finished }
     var statusValue: Status { Status(rawValue: status) ?? .waiting }
 
     var seedBits: UInt64 { UInt64(bitPattern: seed) }
+
+    /// Deterministic per-round seed so a rematch reset never diverges.
+    func seedForRound(_ round: Int) -> UInt64 {
+        var s = seedBits
+        if round > 0 {
+            s = (s ^ (UInt64(round) &* 0x9E3779B97F4A7C15))
+            s = (s ^ (s >> 30)) &* 0xBF58476D1CE4E5B9
+            s ^= s >> 27
+        }
+        return s | 1
+    }
+    var currentSeed: UInt64 { seedForRound(rematchRound) }
 }
 
 /// Which side of a match the local player is on.

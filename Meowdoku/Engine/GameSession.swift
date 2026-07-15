@@ -29,17 +29,22 @@ final class GameSession: ObservableObject {
     @Published private(set) var lastPlaced: Cell? = nil
 
     let allowedMistakes: Int
+    /// When true, placing a correct cat auto-marks the cells it rules out.
+    let autoMark: Bool
     let startedAt = Date()
     private(set) var finishedAt: Date?
 
     struct Cell: Equatable { let row: Int; let col: Int }
     private struct Move { let row: Int; let col: Int; let before: CellMark }
-    private var undoStack: [Move] = []
+    /// Each user action pushes one group, so undo reverts a placement together
+    /// with any auto-marks it triggered.
+    private var undoStack: [[Move]] = []
     private var faultToken = 0
 
-    init(board: MeowBoard, allowedMistakes: Int = 1) {
+    init(board: MeowBoard, allowedMistakes: Int = 1, autoMark: Bool = false) {
         self.board = board
         self.allowedMistakes = allowedMistakes
+        self.autoMark = autoMark
         self.marks = Array(
             repeating: Array(repeating: .empty, count: board.size),
             count: board.size
@@ -65,7 +70,7 @@ final class GameSession: ObservableObject {
         guard !isOver else { return .ignored }
 
         if marks[row][col] == .cat {
-            record(row, col)
+            commit([move(row, col)])
             marks[row][col] = .empty
             if board.isSolutionCell(row: row, col: col) { correctCats -= 1 }
             Haptics.light()
@@ -73,11 +78,13 @@ final class GameSession: ObservableObject {
         }
 
         if board.isSolutionCell(row: row, col: col) {
-            record(row, col)
+            var group = [move(row, col)]
             marks[row][col] = .cat
             correctCats += 1
             lastPlaced = Cell(row: row, col: col)
             clearHint()
+            if autoMark { group += applyAutoMarks(row: row, col: col) }
+            commit(group)
             Haptics.place()
             if correctCats == board.size { win() }
             return .placedCorrect
@@ -101,11 +108,11 @@ final class GameSession: ObservableObject {
         guard !isOver else { return }
         switch marks[row][col] {
         case .empty:
-            record(row, col); marks[row][col] = .blocked; Haptics.light()
+            commit([move(row, col)]); marks[row][col] = .blocked; Haptics.light()
         case .blocked:
-            record(row, col); marks[row][col] = .empty; Haptics.light()
+            commit([move(row, col)]); marks[row][col] = .empty; Haptics.light()
         case .cat:
-            record(row, col)
+            commit([move(row, col)])
             marks[row][col] = .empty
             if board.isSolutionCell(row: row, col: col) { correctCats -= 1 }
             Haptics.light()
@@ -116,13 +123,13 @@ final class GameSession: ObservableObject {
     /// never disturbs cats), so a swipe reliably eliminates a run of cells.
     func paintBlock(row: Int, col: Int) {
         guard !isOver, marks[row][col] == .empty else { return }
-        record(row, col)
+        commit([move(row, col)])
         marks[row][col] = .blocked
     }
 
     func undo() {
-        guard canUndo, let move = undoStack.popLast() else { return }
-        marks[move.row][move.col] = move.before
+        guard canUndo, let group = undoStack.popLast() else { return }
+        for m in group.reversed() { marks[m.row][m.col] = m.before }
         recomputeCorrect()
         Haptics.light()
     }
@@ -171,8 +178,34 @@ final class GameSession: ObservableObject {
         Haptics.error()
     }
 
-    private func record(_ row: Int, _ col: Int) {
-        undoStack.append(Move(row: row, col: col, before: marks[row][col]))
+    /// Snapshot a cell's current mark for the undo group (call *before* mutating).
+    private func move(_ row: Int, _ col: Int) -> Move {
+        Move(row: row, col: col, before: marks[row][col])
+    }
+
+    private func commit(_ group: [Move]) {
+        if !group.isEmpty { undoStack.append(group) }
+    }
+
+    /// Mark every empty cell a correct cat rules out: its row, column, region,
+    /// and the 8 touching cells. Returns the moves so they join the undo group.
+    private func applyAutoMarks(row: Int, col: Int) -> [Move] {
+        var moves: [Move] = []
+        func block(_ r: Int, _ c: Int) {
+            guard r >= 0, r < size, c >= 0, c < size, marks[r][c] == .empty else { return }
+            moves.append(move(r, c))
+            marks[r][c] = .blocked
+        }
+        let region = board.regionID(row: row, col: col)
+        for i in 0..<size {
+            block(row, i)   // row
+            block(i, col)   // column
+        }
+        for r in 0..<size {
+            for c in 0..<size where board.regionID(row: r, col: c) == region { block(r, c) }
+        }
+        for dr in -1...1 { for dc in -1...1 { block(row + dr, col + dc) } }
+        return moves
     }
 
     private func recomputeCorrect() {

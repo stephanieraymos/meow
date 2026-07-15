@@ -41,7 +41,9 @@ private struct GameBoardScreen: View {
         self.onNext = onNext
         self.onExit = onExit
         let board = PuzzleGenerator.generate(seed: mode.seed, size: mode.size)
-        _session = StateObject(wrappedValue: GameSession(board: board, allowedMistakes: mode.allowedMistakes))
+        _session = StateObject(wrappedValue: GameSession(board: board,
+                                                         allowedMistakes: mode.allowedMistakes,
+                                                         autoMark: PlayerProfile.shared.autoMarkOn))
     }
 
     var body: some View {
@@ -139,9 +141,32 @@ private struct GameBoardScreen: View {
             won: session.isWon,
             title: resultTitle,
             subtitle: resultSubtitle,
-            accessory: session.isWon ? AnyView(StarRow(stars: earnedStars)) : nil,
+            accessory: session.isWon ? AnyView(winAccessory) : nil,
             buttons: resultButtons
         )
+    }
+
+    private var winAccessory: some View {
+        VStack(spacing: 12) {
+            StarRow(stars: earnedStars)
+            ShareLink(item: shareText) {
+                Label("Share result", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.bold())
+            }
+            .tint(.white)
+        }
+    }
+
+    /// Spoiler-free brag text (never reveals cat positions).
+    private var shareText: String {
+        let stars = String(repeating: "⭐️", count: earnedStars) + String(repeating: "▫️", count: 3 - earnedStars)
+        var header = "Meowdoku · \(mode.title)"
+        if case .daily(let key) = mode.kind { header = "Meowdoku Daily \(key)" }
+        return """
+        \(header)
+        \(mode.size)×\(mode.size) solved in \(timeString(session.elapsed)) \(PlayerProfile.shared.catGlyph)
+        \(stars)
+        """
     }
 
     private var resultTitle: String {
@@ -181,12 +206,24 @@ private struct GameBoardScreen: View {
         recorded = true
         earnedStars = LevelCatalog.stars(mistakes: session.mistakes, hintsUsed: session.hintsUsed)
         profile.recordGame(won: true)
+        let gc = GameCenter.shared
         switch mode.kind {
-        case .level(let i):      profile.completeLevel(i, stars: earnedStars, time: session.elapsed)
-        case .daily(let key):    profile.recordDaily(key: key, solved: true)
-        case .timeAttack(let s): profile.recordTimeAttack(size: s, time: session.elapsed)
-        case .freeplay:          break
+        case .level(let i):
+            profile.completeLevel(i, stars: earnedStars, time: session.elapsed)
+            gc.submitTime(session.elapsed, leaderboardID: GameCenter.Leaderboard.time(size: mode.size))
+            if i >= 50 { gc.report(GameCenter.Achievement.level50) }
+        case .daily(let key):
+            profile.recordDaily(key: key, solved: true)
+            gc.submitTime(session.elapsed, leaderboardID: GameCenter.Leaderboard.daily)
+            if profile.dailyStreak >= 7 { gc.report(GameCenter.Achievement.streak7) }
+        case .timeAttack(let s):
+            profile.recordTimeAttack(size: s, time: session.elapsed)
+            gc.submitTime(session.elapsed, leaderboardID: GameCenter.Leaderboard.time(size: s))
+        case .freeplay:
+            break
         }
+        gc.report(GameCenter.Achievement.firstWin)
+        if session.mistakes == 0 && session.hintsUsed == 0 { gc.report(GameCenter.Achievement.flawless) }
     }
 
     private func recordLoss() {

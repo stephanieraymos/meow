@@ -19,6 +19,33 @@ final class PlayerProfile: ObservableObject {
         var catStyleID: String = "classic"
         var hapticsOn: Bool = true
         var soundOn: Bool = true
+        var autoMarkOn: Bool = true
+        var tutorialSeen: Bool = false
+
+        init() {}
+
+        /// Resilient decode: every field falls back to its default when absent, so
+        /// adding new fields in a future version never wipes existing progress.
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            func v<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+                (try? c.decodeIfPresent(T.self, forKey: key)) ?? nil ?? fallback
+            }
+            levelStars = v(.levelStars, [:])
+            levelBestTimes = v(.levelBestTimes, [:])
+            dailyStreak = v(.dailyStreak, 0)
+            dailyBestStreak = v(.dailyBestStreak, 0)
+            lastDailyKey = (try? c.decodeIfPresent(String.self, forKey: .lastDailyKey)) ?? nil
+            dailySolved = v(.dailySolved, [:])
+            timeAttackBest = v(.timeAttackBest, [:])
+            totalWins = v(.totalWins, 0)
+            totalGames = v(.totalGames, 0)
+            catStyleID = v(.catStyleID, "classic")
+            hapticsOn = v(.hapticsOn, true)
+            soundOn = v(.soundOn, true)
+            autoMarkOn = v(.autoMarkOn, true)
+            tutorialSeen = v(.tutorialSeen, false)
+        }
     }
 
     @Published private var data: Data { didSet { persist(); Haptics.enabled = data.hapticsOn } }
@@ -116,5 +143,13 @@ final class PlayerProfile: ObservableObject {
     var soundOn: Bool {
         get { data.soundOn }
         set { data.soundOn = newValue }
+    }
+    var autoMarkOn: Bool {
+        get { data.autoMarkOn }
+        set { data.autoMarkOn = newValue }
+    }
+    var tutorialSeen: Bool {
+        get { data.tutorialSeen }
+        set { data.tutorialSeen = newValue }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 /// Cat piece style, feedback toggles, and lifetime stats.
 struct SettingsView: View {
     @ObservedObject private var profile = PlayerProfile.shared
+    @State private var showGameCenter = false
     private let styleColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
 
     var body: some View {
@@ -33,6 +34,13 @@ struct SettingsView: View {
                         }
                     }
 
+                    section("Assist") {
+                        toggle("Auto-mark X's", systemImage: "xmark.square.fill", isOn: Binding(
+                            get: { profile.autoMarkOn }, set: { profile.autoMarkOn = $0 }))
+                        Text("When you place a cat, automatically X out the cells it rules out. Solo modes only.")
+                            .font(.caption).foregroundStyle(.white.opacity(0.55))
+                    }
+
                     section("Feedback") {
                         toggle("Haptics", systemImage: "hand.tap.fill", isOn: Binding(
                             get: { profile.hapticsOn }, set: { profile.hapticsOn = $0 }))
@@ -46,6 +54,11 @@ struct SettingsView: View {
                         statRow("Levels completed", "\(profile.levelsCompleted)/\(LevelCatalog.totalLevels)")
                         statRow("Total stars", "\(profile.totalStars)")
                         statRow("Daily streak", "🔥 \(profile.dailyStreak) (best \(profile.dailyBestStreak))")
+                        Button { showGameCenter = true } label: {
+                            Label("Game Center", systemImage: "trophy.fill")
+                                .foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.top, 4)
                     }
                 }
                 .padding()
@@ -53,6 +66,7 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showGameCenter) { GameCenterDashboard().ignoresSafeArea() }
     }
 
     @ViewBuilder private func section(_ title: String, @ViewBuilder _ content: () -> some View) -> some View {
