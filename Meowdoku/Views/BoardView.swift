@@ -66,14 +66,17 @@ struct BoardView: View {
     }
 
     private func paintGesture(cell: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 16, coordinateSpace: .named("board"))
+        DragGesture(minimumDistance: 10, coordinateSpace: .named("board"))
             .onChanged { value in
-                let c = Int(value.location.x / cell), r = Int(value.location.y / cell)
-                guard r >= 0, r < size, c >= 0, c < size else { return }
-                let key = r * size + c
-                if paintedThisDrag.contains(key) { return }
-                paintedThisDrag.insert(key)
-                onPaint(r, c)
+                // Paint the cell the drag began on, then every new cell it enters.
+                for loc in [value.startLocation, value.location] {
+                    let c = Int(loc.x / cell), r = Int(loc.y / cell)
+                    guard r >= 0, r < size, c >= 0, c < size else { continue }
+                    let key = r * size + c
+                    if paintedThisDrag.contains(key) { continue }
+                    paintedThisDrag.insert(key)
+                    onPaint(r, c)
+                }
             }
             .onEnded { _ in paintedThisDrag.removeAll() }
     }
