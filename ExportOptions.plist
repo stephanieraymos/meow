@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- iOS App Store / TestFlight upload. Automatic signing: with an App Store  -->
+    <!-- Connect API key and -allowProvisioningUpdates, Xcode registers the App   -->
+    <!-- ID and creates/renews the distribution profile for                       -->
+    <!-- com.stephanieraymos.meowdoku on the fly.                                 -->
+    <key>method</key>
+    <string>app-store-connect</string>
+    <key>teamID</key>
+    <string>FZ5HL2XU6U</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>uploadSymbols</key>
+    <true/>
+    <key>compileBitcode</key>
+    <false/>
+</dict>
+</plist>

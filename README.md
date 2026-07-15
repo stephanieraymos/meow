@@ -55,3 +55,30 @@ Info.plist — no credentials in Swift source.
 Supabase table `meow_matches` (project `ihvljgwfslxorxsorzpi`). Row-level
 security allows anonymous access for this two-player game; the row only tracks
 progress and the winner — never the puzzle itself.
+
+## Shipping to TestFlight
+The project is archive-ready: Team `FZ5HL2XU6U`, app icon, and
+`ExportOptions.plist` (App Store Connect, automatic signing) are all configured.
+
+One-time setup (App Store Connect, done in the web UI):
+1. Register the bundle id `com.stephanieraymos.meowdoku` and create the app
+   record at https://appstoreconnect.apple.com → Apps → +.
+
+Each build:
+```sh
+xcodegen generate
+xcodebuild -project Meowdoku.xcodeproj -scheme Meowdoku \
+  -configuration Release -sdk iphoneos \
+  -archivePath build/Meowdoku.xcarchive \
+  -allowProvisioningUpdates archive
+
+xcodebuild -exportArchive \
+  -archivePath build/Meowdoku.xcarchive \
+  -exportOptionsPlist ExportOptions.plist \
+  -exportPath build/export \
+  -allowProvisioningUpdates
+```
+`-allowProvisioningUpdates` lets Xcode register the App ID and mint the
+distribution profile automatically (needs an App Store Connect API key in Xcode's
+accounts, or an interactive Xcode login). Then upload `build/export/Meowdoku.ipa`
+to TestFlight with Transporter or `xcrun altool --upload-app`.
