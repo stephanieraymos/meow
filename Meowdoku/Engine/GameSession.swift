@@ -143,6 +143,7 @@ final class GameSession: ObservableObject {
         guard !isOver, marks[row][col] == .empty else { return }
         commit([move(row, col)])
         marks[row][col] = .blocked
+        Haptics.selection()
         SoundPlayer.shared.play(.tick)
     }
 

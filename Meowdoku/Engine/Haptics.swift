@@ -11,6 +11,15 @@ enum Haptics {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
+    /// A crisp tick for each cell crossed while dragging X's — designed for rapid
+    /// repeats, so it stays light and never stutters.
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+    static func selection() {
+        guard enabled else { return }
+        selectionGenerator.selectionChanged()
+        selectionGenerator.prepare()
+    }
+
     static func place() {
         guard enabled else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
