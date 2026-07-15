@@ -136,6 +136,12 @@ final class RaceStore: ObservableObject {
         }
     }
 
+    /// Paint an X note while dragging (never affects win/loss).
+    func paint(row: Int, col: Int) {
+        guard phase == .playing, let session, !session.isOver else { return }
+        session.paintBlock(row: row, col: col)
+    }
+
     private func pushProgress() {
         guard let id = match?.id, let session else { return }
         let p = session.progress

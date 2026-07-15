@@ -13,11 +13,14 @@ struct RaceGameView: View {
                 VStack(spacing: 14) {
                     scoreboard(session: session)
                     BoardView(session: session,
-                              onTap: { r, c in store.tap(row: r, col: c, noteMode: noteMode) },
-                              onLongPress: { r, c in store.tap(row: r, col: c, noteMode: true) })
+                              catGlyph: PlayerProfile.shared.catGlyph,
+                              onSingleTap: { r, c in store.tap(row: r, col: c, noteMode: true) },
+                              onDoubleTap: { r, c in store.tap(row: r, col: c, noteMode: false) },
+                              onPaint: { r, c in store.paint(row: r, col: c) })
                         .padding(.horizontal, 8)
                         .disabled(store.phase != .playing)
-                    controls
+                    Text("Double-tap to place a cat · tap or drag to mark X")
+                        .font(.caption2).foregroundStyle(.white.opacity(0.55))
                 }
                 .padding()
             } else {
@@ -28,8 +31,6 @@ struct RaceGameView: View {
             if store.phase == .finished { resultOverlay }
         }
     }
-
-    @State private var noteMode = false
 
     // MARK: Scoreboard
 
@@ -64,16 +65,6 @@ struct RaceGameView: View {
         }
     }
 
-    private var controls: some View {
-        Picker("", selection: $noteMode) {
-            Label("Cat", systemImage: "cat.fill").tag(false)
-            Label("Note", systemImage: "xmark.square").tag(true)
-        }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: 240)
-        .disabled(store.phase != .playing)
-    }
-
     // MARK: Overlays
 
     private var countdownOverlay: some View {
@@ -94,10 +85,11 @@ struct RaceGameView: View {
         let won = store.iWon == true
         return ResultCard(
             won: won,
-            title: won ? "You win! 🏆" : "Audie wins",
+            title: won ? "You win! 🏆" : "\(displayOpp) wins",
             subtitle: subtitle(won: won),
-            primaryTitle: "Back to lobby",
-            primaryAction: { store.reset() }
+            buttons: [
+                ResultButton(title: "Back to lobby", style: .prominent, tint: .pink) { store.reset() },
+            ]
         )
     }
 
