@@ -134,6 +134,7 @@ struct RaceGameView: View {
 
 /// Owns the race lifecycle and swaps between lobby and live game by phase.
 struct RaceContainerView: View {
+    var initialCode: String? = nil
     @StateObject private var store = RaceStore()
     @Environment(\.dismiss) private var dismiss
 
@@ -141,7 +142,7 @@ struct RaceContainerView: View {
         Group {
             switch store.phase {
             case .lobby, .waitingForOpponent:
-                RaceLobbyView(store: store)
+                RaceLobbyView(store: store, initialCode: initialCode)
             case .countdown, .playing, .finished:
                 RaceGameView(store: store)
             }

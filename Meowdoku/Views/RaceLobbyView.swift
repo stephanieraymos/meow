@@ -4,11 +4,13 @@ import SwiftUI
 /// code until the guest joins.
 struct RaceLobbyView: View {
     @ObservedObject var store: RaceStore
+    var initialCode: String? = nil
     @AppStorage("meow_player_name") private var playerName: String = ""
     @AppStorage("meow_player_id") private var selectedID: String = ""
     @State private var players: [MeowPlayer] = []
     @State private var joinCode = ""
     @State private var difficulty: Difficulty = .normal
+    @State private var autoJoined = false
     @FocusState private var focused: Bool
 
     private var selectedAvatar: String? {
@@ -26,6 +28,15 @@ struct RaceLobbyView: View {
         }
         .task {
             if players.isEmpty { players = (try? await MeowAPI.fetchPlayers()) ?? [] }
+            // Arrived via an invite link: pre-fill the code and, if we already
+            // know who this player is, join straight away.
+            if let code = initialCode, !code.isEmpty, joinCode.isEmpty {
+                joinCode = code
+                if !autoJoined, !playerName.isEmpty {
+                    autoJoined = true
+                    await store.joinMatch(name: playerName, code: code, avatar: selectedAvatar)
+                }
+            }
         }
     }
 
@@ -149,8 +160,8 @@ struct RaceLobbyView: View {
                 .foregroundStyle(MeowTheme.ink)
                 .tracking(6)
             if let code = store.match?.code {
-                ShareLink(item: "Join my Meowdoku race! Code: \(code)") {
-                    Label("Share code", systemImage: "square.and.arrow.up")
+                ShareLink(item: "Race me in Meowdoku! 🐱 Tap to join: meowdoku://race/\(code)  (or enter code \(code))") {
+                    Label("Send invite", systemImage: "square.and.arrow.up")
                 }.tint(.pink)
             }
             ProgressView("Waiting for Audie to join…")

@@ -7,14 +7,15 @@ struct HomeView: View {
     @State private var showTutorial = false
 
     enum Route: Hashable, Identifiable {
-        case daily, levels, race, settings
+        case daily, levels, settings
+        case race(code: String?)
         case timeAttack(size: Int, seed: UInt64)
         case freeplay(size: Int, seed: UInt64)
         var id: String {
             switch self {
             case .daily: return "daily"
             case .levels: return "levels"
-            case .race: return "race"
+            case .race(let code): return "race-\(code ?? "")"
             case .settings: return "settings"
             case .timeAttack(let s, let seed): return "ta-\(s)-\(seed)"
             case .freeplay(let s, let seed): return "fp-\(s)-\(seed)"
@@ -57,6 +58,13 @@ struct HomeView: View {
         .tint(MeowTheme.ink)
         .fullScreenCover(isPresented: $showTutorial) { TutorialView() }
         .onAppear { if !profile.tutorialSeen { showTutorial = true } }
+        .onOpenURL { url in
+            // meowdoku://race/CODE  → jump into the lobby and auto-join.
+            if url.scheme == "meowdoku", url.host == "race" {
+                let code = url.pathComponents.last(where: { $0 != "/" })
+                route = .race(code: code?.uppercased())
+            }
+        }
     }
 
     @ViewBuilder
@@ -64,7 +72,7 @@ struct HomeView: View {
         switch route {
         case .daily:                       GameplayView(mode: .daily(key: DailyPuzzle.dateKey()))
         case .levels:                      LevelSelectView()
-        case .race:                        RaceContainerView()
+        case .race(let code):              RaceContainerView(initialCode: code)
         case .settings:                    SettingsView()
         case .timeAttack(let s, let seed): GameplayView(mode: .timeAttack(size: s, seed: seed))
         case .freeplay(let s, let seed):   GameplayView(mode: .freeplay(difficulty: Difficulty(rawValue: s) ?? .normal, seed: seed))
@@ -117,7 +125,7 @@ struct HomeView: View {
     }
 
     private var raceCard: some View {
-        Button { route = .race } label: {
+        Button { route = .race(code: nil) } label: {
             bigCard(icon: "bolt.fill", title: "Race Audie",
                     subtitle: "Live head-to-head · one mistake, no hints", tint: .orange)
         }

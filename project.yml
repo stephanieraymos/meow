@@ -35,6 +35,11 @@ targets:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
+        # Deep link for race invites: meowdoku://race/CODE
+        CFBundleURLTypes:
+          - CFBundleURLName: com.stephanieraymos.meowdoku
+            CFBundleURLSchemes:
+              - meowdoku
         # Supabase publishable client key + URL — injected here rather than in
         # Swift source. All access is gated by row-level security on the server.
         SUPABASE_URL: https://ihvljgwfslxorxsorzpi.supabase.co
