@@ -23,6 +23,7 @@ final class PlayerProfile: ObservableObject {
         var tutorialSeen: Bool = false
         var remindersOn: Bool = false
         var appearance: String = "dark"
+        var paletteID: String = "classic"
 
         init() {}
 
@@ -49,6 +50,7 @@ final class PlayerProfile: ObservableObject {
             tutorialSeen = v(.tutorialSeen, false)
             remindersOn = v(.remindersOn, false)
             appearance = v(.appearance, "dark")
+            paletteID = v(.paletteID, "classic")
         }
     }
 
@@ -163,5 +165,13 @@ final class PlayerProfile: ObservableObject {
     var appearance: Appearance {
         get { Appearance(rawValue: data.appearance) ?? .dark }
         set { data.appearance = newValue.rawValue }
+    }
+    var palette: MeowPalette {
+        get { MeowPalettes.palette(data.paletteID) }
+        set { data.paletteID = newValue.id }
+    }
+    var paletteID: String {
+        get { data.paletteID }
+        set { data.paletteID = newValue }
     }
 }

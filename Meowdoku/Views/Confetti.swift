@@ -4,7 +4,7 @@ import SwiftUI
 /// tumble. No assets, no dependencies.
 struct ConfettiView: View {
     var count = 70
-    private let palette = MeowTheme.regionColors
+    private let palette = PlayerProfile.shared.palette.colors
 
     var body: some View {
         GeometryReader { geo in

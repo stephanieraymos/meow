@@ -61,20 +61,35 @@ enum MeowAPI {
 
     // MARK: - Operations
 
+    /// The pickable racers (anon-readable, seeded from family members).
+    static func fetchPlayers() async throws -> [MeowPlayer] {
+        let (data, http) = try await request(
+            path: "meow_players", method: "GET",
+            query: [.init(name: "select", value: "id,name,avatar_url"),
+                    .init(name: "order", value: "sort,name")])
+        guard http.statusCode == 200 else {
+            throw APIError.badResponse(http.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        do { return try decoder.decode([MeowPlayer].self, from: data) }
+        catch { throw APIError.decoding(String(describing: error)) }
+    }
+
     /// Host creates a match. Retries a couple of times if the random code collides.
-    static func createMatch(hostName: String, size: Int, seed: Int64) async throws -> Match {
+    static func createMatch(hostName: String, size: Int, seed: Int64, avatar: String?) async throws -> Match {
         for _ in 0..<4 {
             let code = randomCode()
+            var body: [String: Any] = [
+                "code": code,
+                "size": size,
+                "seed": seed,
+                "status": "waiting",
+                "host_name": hostName,
+            ]
+            if let avatar { body["host_avatar"] = avatar }
             let (data, http) = try await request(
                 path: "meow_matches",
                 method: "POST",
-                body: [
-                    "code": code,
-                    "size": size,
-                    "seed": seed,
-                    "status": "waiting",
-                    "host_name": hostName,
-                ],
+                body: body,
                 prefer: "return=representation"
             )
             if http.statusCode == 201 {
@@ -88,7 +103,13 @@ enum MeowAPI {
 
     /// Guest joins by code. Atomically claims the empty guest slot and flips the
     /// match to `playing`. Returns the started match, or throws if not joinable.
-    static func joinMatch(code: String, guestName: String) async throws -> Match {
+    static func joinMatch(code: String, guestName: String, avatar: String?) async throws -> Match {
+        var body: [String: Any] = [
+            "guest_name": guestName,
+            "status": "playing",
+            "started_at": iso8601Now(),
+        ]
+        if let avatar { body["guest_avatar"] = avatar }
         let (data, http) = try await request(
             path: "meow_matches",
             method: "PATCH",
@@ -97,11 +118,7 @@ enum MeowAPI {
                 .init(name: "guest_name", value: "is.null"),
                 .init(name: "status", value: "eq.waiting"),
             ],
-            body: [
-                "guest_name": guestName,
-                "status": "playing",
-                "started_at": iso8601Now(),
-            ],
+            body: body,
             prefer: "return=representation"
         )
         guard http.statusCode == 200 else {

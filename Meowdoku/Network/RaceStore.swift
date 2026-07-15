@@ -24,6 +24,8 @@ final class RaceStore: ObservableObject {
     @Published var role: PlayerRole = .host
     @Published var myName: String = ""
     @Published var opponentName: String = ""
+    @Published var myAvatar: String? = nil
+    @Published var opponentAvatar: String? = nil
     @Published var opponentProgress: Int = 0
     @Published var opponentAlive: Bool = true
     @Published var countdownValue: Int = 3
@@ -44,13 +46,14 @@ final class RaceStore: ObservableObject {
 
     // MARK: - Lobby actions
 
-    func createMatch(name: String, size: Int) async {
+    func createMatch(name: String, size: Int, avatar: String? = nil) async {
         myName = name.isEmpty ? "Player 1" : name
+        myAvatar = avatar
         role = .host
         busy = true; errorMessage = nil
         do {
             let seed = Int64.random(in: Int64.min...Int64.max)
-            match = try await MeowAPI.createMatch(hostName: myName, size: size, seed: seed)
+            match = try await MeowAPI.createMatch(hostName: myName, size: size, seed: seed, avatar: avatar)
             phase = .waitingForOpponent
             startSync()
         } catch {
@@ -59,14 +62,16 @@ final class RaceStore: ObservableObject {
         busy = false
     }
 
-    func joinMatch(name: String, code: String) async {
+    func joinMatch(name: String, code: String, avatar: String? = nil) async {
         myName = name.isEmpty ? "Player 2" : name
+        myAvatar = avatar
         role = .guest
         busy = true; errorMessage = nil
         do {
-            let m = try await MeowAPI.joinMatch(code: code.uppercased(), guestName: myName)
+            let m = try await MeowAPI.joinMatch(code: code.uppercased(), guestName: myName, avatar: avatar)
             match = m
             opponentName = m.hostName
+            opponentAvatar = m.hostAvatar
             startSync()
             beginCountdown()
         } catch {
@@ -118,10 +123,13 @@ final class RaceStore: ObservableObject {
         opponentProgress = role == .host ? fresh.guestProgress : fresh.hostProgress
         opponentAlive = role == .host ? fresh.guestAlive : fresh.hostAlive
 
+        opponentAvatar = role == .host ? fresh.guestAvatar : fresh.hostAvatar
+
         switch phase {
         case .waitingForOpponent:
             if fresh.statusValue == .playing, let guest = fresh.guestName {
                 opponentName = guest
+                opponentAvatar = fresh.guestAvatar
                 beginCountdown()
             }
 
@@ -284,6 +292,8 @@ final class RaceStore: ObservableObject {
         phase = .lobby
         match = nil
         session = nil
+        opponentName = ""
+        opponentAvatar = nil
         opponentProgress = 0
         opponentAlive = true
         iWon = nil

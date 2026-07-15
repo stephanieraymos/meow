@@ -7,6 +7,7 @@ import SwiftUI
 struct BoardView: View {
     @ObservedObject var session: GameSession
     var style: CatStyle = CatStyles.all[0]
+    var palette: MeowPalette = MeowPalettes.classic
     var spotlight: GameSession.Cell? = nil
     var onSingleTap: (Int, Int) -> Void
     var onDoubleTap: (Int, Int) -> Void
@@ -99,7 +100,7 @@ struct BoardView: View {
         ZStack {
             // Rounded tile with a soft top highlight for depth.
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(isFault ? Color(red: 0.94, green: 0.35, blue: 0.33) : MeowTheme.regionColor(region))
+                .fill(isFault ? Color(red: 0.94, green: 0.35, blue: 0.33) : palette.color(region))
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .fill(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.02)],

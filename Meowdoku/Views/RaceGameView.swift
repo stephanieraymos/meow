@@ -14,6 +14,7 @@ struct RaceGameView: View {
                     scoreboard(session: session)
                     BoardView(session: session,
                               style: PlayerProfile.shared.catStyle,
+                              palette: PlayerProfile.shared.palette,
                               onSingleTap: { r, c in store.tap(row: r, col: c, noteMode: true) },
                               onDoubleTap: { r, c in store.tap(row: r, col: c, noteMode: false) },
                               onPaint: { r, c in store.paint(row: r, col: c) })
@@ -37,15 +38,17 @@ struct RaceGameView: View {
     private func scoreboard(session: GameSession) -> some View {
         let n = store.boardSize
         return VStack(spacing: 10) {
-            progressRow(name: store.myName.isEmpty ? "You" : store.myName,
+            progressRow(name: store.myName.isEmpty ? "You" : store.myName, avatar: store.myAvatar,
                         value: session.progress, total: n, alive: !session.isLost, mine: true)
-            progressRow(name: store.opponentName.isEmpty ? "Audie" : store.opponentName,
+            progressRow(name: store.opponentName.isEmpty ? "Audie" : store.opponentName, avatar: store.opponentAvatar,
                         value: store.opponentProgress, total: n, alive: store.opponentAlive, mine: false)
         }
     }
 
-    private func progressRow(name: String, value: Int, total: Int, alive: Bool, mine: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+    private func progressRow(name: String, avatar: String?, value: Int, total: Int, alive: Bool, mine: Bool) -> some View {
+        HStack(spacing: 10) {
+            CachedAvatar(urlString: avatar, name: name, size: 38)
+            VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(name).font(.subheadline.bold()).foregroundStyle(MeowTheme.ink)
                 if !alive { Text("💥 out").font(.caption).foregroundStyle(.orange) }
@@ -62,6 +65,7 @@ struct RaceGameView: View {
                 }
             }
             .frame(height: 10)
+            }
         }
     }
 

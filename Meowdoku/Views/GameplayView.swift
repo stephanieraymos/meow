@@ -54,6 +54,7 @@ private struct GameBoardScreen: View {
                 header
                 BoardView(session: session,
                           style: profile.catStyle,
+                          palette: profile.palette,
                           onSingleTap: { r, c in session.toggleBlock(row: r, col: c) },
                           onDoubleTap: { r, c in session.placeCat(row: r, col: c) },
                           onPaint: { r, c in session.paintBlock(row: r, col: c) })

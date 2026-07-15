@@ -42,6 +42,36 @@ struct SettingsView: View {
                         }
                     }
 
+                    section("Square colors") {
+                        VStack(spacing: 10) {
+                            ForEach(MeowPalettes.all) { p in
+                                Button {
+                                    profile.paletteID = p.id
+                                    Haptics.light()
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        HStack(spacing: 3) {
+                                            ForEach(0..<p.colors.count, id: \.self) { i in
+                                                RoundedRectangle(cornerRadius: 4)
+                                                    .fill(p.colors[i])
+                                                    .frame(width: 18, height: 24)
+                                            }
+                                        }
+                                        Text(p.name).font(.subheadline.bold()).foregroundStyle(MeowTheme.ink)
+                                        Spacer()
+                                        if profile.paletteID == p.id {
+                                            Image(systemName: "checkmark.circle.fill").foregroundStyle(.pink)
+                                        }
+                                    }
+                                    .padding(8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(profile.paletteID == p.id ? Color.pink.opacity(0.18) : .clear))
+                                }
+                            }
+                        }
+                    }
+
                     section("Assist") {
                         toggle("Auto-mark X's", systemImage: "xmark.square.fill", isOn: Binding(
                             get: { profile.autoMarkOn }, set: { profile.autoMarkOn = $0 }))

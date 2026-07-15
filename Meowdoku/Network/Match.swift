@@ -16,6 +16,8 @@ struct Match: Codable, Identifiable, Equatable {
     var guestProgress: Int
     var hostAlive: Bool
     var guestAlive: Bool
+    var hostAvatar: String?
+    var guestAvatar: String?
     var rematchOffer: String?
     var rematchRound: Int
 
@@ -39,3 +41,10 @@ struct Match: Codable, Identifiable, Equatable {
 
 /// Which side of a match the local player is on.
 enum PlayerRole { case host, guest }
+
+/// A pickable racer (from the anon-readable `meow_players` table).
+struct MeowPlayer: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var avatarUrl: String?
+}
