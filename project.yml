@@ -25,7 +25,12 @@ targets:
         CFBundleDisplayName: Meowdoku
         CFBundleShortVersionString: "1.0"
         UILaunchScreen: {}
+        # Portrait-only. UIRequiresFullScreen opts out of iPad multitasking so a
+        # single orientation is allowed on iPad (App Store validation 90474).
+        UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
           - UIInterfaceOrientationPortrait
         # Supabase publishable client key + URL — injected here rather than in
         # Swift source. All access is gated by row-level security on the server.
