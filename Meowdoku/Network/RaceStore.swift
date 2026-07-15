@@ -172,7 +172,9 @@ final class RaceStore: ObservableObject {
         currentRound = m.rematchRound
         // Both players generate the *same* puzzle from the shared per-round seed.
         let board = PuzzleGenerator.generate(seed: m.currentSeed, size: m.size)
-        session = GameSession(board: board, allowedMistakes: 1)
+        // Never auto-mark X's in a race — it would hand an unfair time advantage
+        // to whoever has the solo setting on. Everyone marks by hand here.
+        session = GameSession(board: board, allowedMistakes: 1, autoMark: false)
         opponentProgress = 0
         opponentAlive = true
         iWon = nil
