@@ -15,6 +15,7 @@ struct BoardView: View {
 
     @State private var shakeAmount: CGFloat = 0
     @State private var paintedThisDrag: Set<Int> = []
+    @State private var lastPaint: CGPoint? = nil
     // Manual double-tap detection so a single tap (X) never waits on SwiftUI's
     // double-tap timeout — the X appears immediately.
     @State private var lastTapCell: Int = -1
@@ -69,17 +70,27 @@ struct BoardView: View {
     private func paintGesture(cell: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 10, coordinateSpace: .named("board"))
             .onChanged { value in
-                // Paint the cell the drag began on, then every new cell it enters.
-                for loc in [value.startLocation, value.location] {
-                    let c = Int(loc.x / cell), r = Int(loc.y / cell)
-                    guard r >= 0, r < size, c >= 0, c < size else { continue }
-                    let key = r * size + c
-                    if paintedThisDrag.contains(key) { continue }
-                    paintedThisDrag.insert(key)
-                    onPaint(r, c)
-                }
+                // Interpolate from the previous sample so fast drags never skip
+                // cells between two sampled points.
+                paintLine(from: lastPaint ?? value.startLocation, to: value.location, cell: cell)
+                lastPaint = value.location
             }
-            .onEnded { _ in paintedThisDrag.removeAll() }
+            .onEnded { _ in paintedThisDrag.removeAll(); lastPaint = nil }
+    }
+
+    private func paintLine(from: CGPoint, to: CGPoint, cell: CGFloat) {
+        let dx = to.x - from.x, dy = to.y - from.y
+        // Step in sub-cell increments so every crossed cell is sampled.
+        let steps = max(1, Int(max(abs(dx), abs(dy)) / (cell * 0.4)))
+        for i in 0...steps {
+            let t = CGFloat(i) / CGFloat(steps)
+            let c = Int((from.x + dx * t) / cell), r = Int((from.y + dy * t) / cell)
+            guard r >= 0, r < size, c >= 0, c < size else { continue }
+            let key = r * size + c
+            if paintedThisDrag.contains(key) { continue }
+            paintedThisDrag.insert(key)
+            onPaint(r, c)
+        }
     }
 
     // MARK: - Cell
