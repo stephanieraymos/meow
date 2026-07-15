@@ -28,7 +28,7 @@ struct TutorialView: View {
                 header
                 instructionBanner
                 BoardView(session: session,
-                          catGlyph: profile.catGlyph,
+                          style: profile.catStyle,
                           spotlight: session.isWon ? nil : target,
                           onSingleTap: { _, _ in },
                           onDoubleTap: { r, c in placeIfTarget(r, c) },

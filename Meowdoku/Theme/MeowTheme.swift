@@ -3,19 +3,20 @@ import SwiftUI
 /// Visual language for Meowdoku — region colors, cat glyphs, and shared styling.
 enum MeowTheme {
 
-    /// Distinct, cat-friendly region fills. Index by region id (mod count).
-    /// Chosen for high mutual contrast and readability in light *and* dark mode.
+    /// Ten maximally-distinct region fills, ordered so consecutive region ids
+    /// (which tend to sit next to each other) land far apart on the color wheel.
+    /// No two are close, so regions are easy to tell apart at a glance.
     static let regionColors: [Color] = [
-        Color(red: 0.98, green: 0.80, blue: 0.36), // marmalade
-        Color(red: 0.55, green: 0.78, blue: 0.98), // sky
-        Color(red: 0.99, green: 0.62, blue: 0.60), // salmon
-        Color(red: 0.68, green: 0.86, blue: 0.62), // sage
-        Color(red: 0.82, green: 0.70, blue: 0.96), // lilac
-        Color(red: 0.98, green: 0.86, blue: 0.55), // cream
-        Color(red: 0.60, green: 0.90, blue: 0.86), // seafoam
-        Color(red: 0.96, green: 0.71, blue: 0.85), // blossom
-        Color(red: 0.74, green: 0.80, blue: 0.55), // moss
-        Color(red: 0.80, green: 0.76, blue: 0.72), // stone
+        Color(red: 0.96, green: 0.44, blue: 0.42), // coral / red
+        Color(red: 0.16, green: 0.74, blue: 0.76), // teal
+        Color(red: 0.98, green: 0.82, blue: 0.30), // gold
+        Color(red: 0.62, green: 0.46, blue: 0.94), // violet
+        Color(red: 0.38, green: 0.78, blue: 0.44), // green
+        Color(red: 0.98, green: 0.52, blue: 0.82), // pink
+        Color(red: 0.30, green: 0.60, blue: 0.96), // sky blue
+        Color(red: 0.99, green: 0.60, blue: 0.24), // orange
+        Color(red: 0.55, green: 0.60, blue: 0.74), // slate
+        Color(red: 0.76, green: 0.54, blue: 0.38), // brown
     ]
 
     static func regionColor(_ id: Int) -> Color {

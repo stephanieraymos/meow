@@ -13,7 +13,7 @@ struct RaceGameView: View {
                 VStack(spacing: 14) {
                     scoreboard(session: session)
                     BoardView(session: session,
-                              catGlyph: PlayerProfile.shared.catGlyph,
+                              style: PlayerProfile.shared.catStyle,
                               onSingleTap: { r, c in store.tap(row: r, col: c, noteMode: true) },
                               onDoubleTap: { r, c in store.tap(row: r, col: c, noteMode: false) },
                               onPaint: { r, c in store.paint(row: r, col: c) })

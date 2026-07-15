@@ -136,7 +136,7 @@ final class PlayerProfile: ObservableObject {
         get { data.catStyleID }
         set { data.catStyleID = newValue }
     }
-    var catGlyph: String { CatStyles.glyph(for: data.catStyleID) }
+    var catStyle: CatStyle { CatStyles.style(data.catStyleID) }
 
     var hapticsOn: Bool {
         get { data.hapticsOn }

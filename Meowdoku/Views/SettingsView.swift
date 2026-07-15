@@ -18,8 +18,8 @@ struct SettingsView: View {
                                     profile.catStyleID = style.id
                                     Haptics.light()
                                 } label: {
-                                    Text(style.glyph)
-                                        .font(.system(size: 34))
+                                    CatFace(style: style)
+                                        .frame(width: 40, height: 40)
                                         .frame(width: 54, height: 54)
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)

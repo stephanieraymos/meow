@@ -53,11 +53,12 @@ private struct GameBoardScreen: View {
                 topBar
                 header
                 BoardView(session: session,
-                          catGlyph: profile.catGlyph,
+                          style: profile.catStyle,
                           onSingleTap: { r, c in session.toggleBlock(row: r, col: c) },
                           onDoubleTap: { r, c in session.placeCat(row: r, col: c) },
                           onPaint: { r, c in session.paintBlock(row: r, col: c) })
                     .padding(.horizontal, 8)
+                hintBanner
                 controls
             }
             .padding()
@@ -108,6 +109,20 @@ private struct GameBoardScreen: View {
                     .foregroundStyle(i < session.heartsRemaining ? .pink : .white.opacity(0.3))
                     .font(.subheadline)
             }
+        }
+    }
+
+    @ViewBuilder private var hintBanner: some View {
+        if let reason = session.hintReason {
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.fill").foregroundStyle(.yellow)
+                Text(reason).font(.footnote).foregroundStyle(.white)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+            .transition(.opacity)
         }
     }
 
@@ -164,7 +179,7 @@ private struct GameBoardScreen: View {
         if case .daily(let key) = mode.kind { header = "Meowdoku Daily \(key)" }
         return """
         \(header)
-        \(mode.size)×\(mode.size) solved in \(timeString(session.elapsed)) \(PlayerProfile.shared.catGlyph)
+        \(mode.size)×\(mode.size) solved in \(timeString(session.elapsed)) 🐱
         \(stars)
         """
     }

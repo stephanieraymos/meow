@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// Renders the Meowdoku grid and routes gestures:
-///  - single tap  → toggle an "X" note (or clear a cat)
+/// Renders the Meowdoku grid as rounded, colorful tiles and routes gestures:
+///  - single tap  → toggle an "X" note (fires instantly)
 ///  - double tap  → place / remove a cat
 ///  - drag        → paint "X" notes across empty cells
 struct BoardView: View {
     @ObservedObject var session: GameSession
-    var catGlyph: String = "🐱"
+    var style: CatStyle = CatStyles.all[0]
     var spotlight: GameSession.Cell? = nil
     var onSingleTap: (Int, Int) -> Void
     var onDoubleTap: (Int, Int) -> Void
@@ -14,6 +14,10 @@ struct BoardView: View {
 
     @State private var shakeAmount: CGFloat = 0
     @State private var paintedThisDrag: Set<Int> = []
+    // Manual double-tap detection so a single tap (X) never waits on SwiftUI's
+    // double-tap timeout — the X appears immediately.
+    @State private var lastTapCell: Int = -1
+    @State private var lastTapAt: Date = .distantPast
 
     private var board: MeowBoard { session.board }
     private var size: Int { board.size }
@@ -30,8 +34,7 @@ struct BoardView: View {
                             cellView(r, c, cell: cell)
                                 .frame(width: cell, height: cell)
                                 .contentShape(Rectangle())
-                                .onTapGesture(count: 2) { onDoubleTap(r, c) }
-                                .onTapGesture(count: 1) { onSingleTap(r, c) }
+                                .onTapGesture { handleTap(r, c) }
                         }
                     }
                 }
@@ -39,23 +42,33 @@ struct BoardView: View {
             .frame(width: side, height: side)
             .coordinateSpace(name: "board")
             .simultaneousGesture(paintGesture(cell: cell))
-            .overlay(RegionOutlines(regions: board.regions, size: size).stroke(MeowTheme.regionBorder, lineWidth: 2.5))
-            .overlay(RoundedRectangle(cornerRadius: 6).stroke(MeowTheme.regionBorder, lineWidth: 3))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .aspectRatio(1, contentMode: .fit)
-        .onChange(of: session.faultCell) { _, newValue in
-            if newValue != nil { withAnimation(.linear(duration: 0.45)) { shakeAmount += 1 } }
+        .onChange(of: session.faultCell) { _, v in
+            if v != nil { withAnimation(.linear(duration: 0.4)) { shakeAmount += 1 } }
         }
     }
 
-    /// Drag beyond a small threshold paints X's on the empty cells it passes over.
+    // MARK: - Gestures
+
+    private func handleTap(_ r: Int, _ c: Int) {
+        let key = r * size + c
+        let now = Date()
+        if key == lastTapCell, now.timeIntervalSince(lastTapAt) < 0.32 {
+            lastTapCell = -1                 // consume, so a 3rd tap starts fresh
+            onDoubleTap(r, c)
+        } else {
+            lastTapCell = key
+            lastTapAt = now
+            onSingleTap(r, c)
+        }
+    }
+
     private func paintGesture(cell: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 16, coordinateSpace: .named("board"))
             .onChanged { value in
-                let c = Int(value.location.x / cell)
-                let r = Int(value.location.y / cell)
+                let c = Int(value.location.x / cell), r = Int(value.location.y / cell)
                 guard r >= 0, r < size, c >= 0, c < size else { return }
                 let key = r * size + c
                 if paintedThisDrag.contains(key) { return }
@@ -65,42 +78,72 @@ struct BoardView: View {
             .onEnded { _ in paintedThisDrag.removeAll() }
     }
 
+    // MARK: - Cell
+
     @ViewBuilder
     private func cellView(_ r: Int, _ c: Int, cell: CGFloat) -> some View {
         let mark = session.mark(row: r, col: c)
-        let cellID = GameSession.Cell(row: r, col: c)
-        let isFault = session.faultCell == cellID
-        let isHint = session.hintCell == cellID || spotlight == cellID
+        let id = GameSession.Cell(row: r, col: c)
+        let isFault = session.faultCell == id
+        let isHint = session.hintCell == id || spotlight == id
+        let region = board.regionID(row: r, col: c)
+        let inset = cell * 0.045
+        let radius = cell * 0.20
 
         ZStack {
-            Rectangle()
-                .fill(isFault ? Color.red.opacity(0.85) : MeowTheme.regionColor(board.regionID(row: r, col: c)))
-            Rectangle().stroke(MeowTheme.gridLine, lineWidth: 0.5)
+            // Rounded tile with a soft top highlight for depth.
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(isFault ? Color(red: 0.94, green: 0.35, blue: 0.33) : MeowTheme.regionColor(region))
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.02)],
+                                             startPoint: .top, endPoint: .center))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(.black.opacity(0.10), lineWidth: 1)
+                )
+                .padding(inset)
+                .shadow(color: .black.opacity(0.12), radius: 1, y: 1)
 
             if isHint {
-                RoundedRectangle(cornerRadius: cell * 0.14)
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(Color.white, lineWidth: 3)
-                    .padding(cell * 0.08)
+                    .padding(inset)
                     .modifier(PulseEffect())
             }
 
             switch mark {
             case .cat:
-                Text(catGlyph)
-                    .font(.system(size: cell * 0.62))
-                    .minimumScaleFactor(0.5)
-                    .transition(.scale(scale: 0.2).combined(with: .opacity))
+                CatFace(style: style)
+                    .frame(width: cell * 0.82, height: cell * 0.82)
+                    .shadow(color: .black.opacity(0.18), radius: 1, y: 1)
+                    .transition(.scale(scale: 0.3).combined(with: .opacity))
             case .blocked:
-                Image(systemName: "xmark")
-                    .font(.system(size: cell * 0.32, weight: .bold))
-                    .foregroundStyle(.black.opacity(0.45))
-                    .transition(.scale.combined(with: .opacity))
+                XMark().frame(width: cell * 0.44, height: cell * 0.44)
+                    .transition(.opacity)
             case .empty:
                 EmptyView()
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.55), value: mark)
+        .animation(.snappy(duration: 0.18), value: mark)
         .modifier(Shake(animatableData: isFault ? shakeAmount : 0))
+    }
+}
+
+/// A bold, rounded white "X" note — the reference game's look.
+struct XMark: View {
+    var body: some View {
+        GeometryReader { geo in
+            let s = min(geo.size.width, geo.size.height)
+            ZStack {
+                Capsule().fill(.white).frame(width: s, height: s * 0.24).rotationEffect(.degrees(45))
+                Capsule().fill(.white).frame(width: s, height: s * 0.24).rotationEffect(.degrees(-45))
+            }
+            .frame(width: s, height: s)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .shadow(color: .black.opacity(0.12), radius: 0.5, y: 0.5)
+        }
     }
 }
 
@@ -117,45 +160,9 @@ struct PulseEffect: ViewModifier {
     @State private var on = false
     func body(content: Content) -> some View {
         content
-            .scaleEffect(on ? 1.0 : 0.88)
-            .opacity(on ? 1.0 : 0.4)
+            .scaleEffect(on ? 1.0 : 0.9)
+            .opacity(on ? 1.0 : 0.45)
             .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: on)
             .onAppear { on = true }
-    }
-}
-
-/// A Shape that traces the boundaries *between* differently-colored regions
-/// (and the outer edge), so regions read as bold outlined territories.
-struct RegionOutlines: Shape {
-    let regions: [[Int]]
-    let size: Int
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let cell = min(rect.width, rect.height) / CGFloat(size)
-        func id(_ r: Int, _ c: Int) -> Int? {
-            guard r >= 0, r < size, c >= 0, c < size else { return nil }
-            return regions[r][c]
-        }
-        for r in 0..<size {
-            for c in 0..<size {
-                let me = regions[r][c]
-                let x = CGFloat(c) * cell
-                let y = CGFloat(r) * cell
-                if id(r - 1, c) != me {
-                    path.move(to: CGPoint(x: x, y: y)); path.addLine(to: CGPoint(x: x + cell, y: y))
-                }
-                if id(r, c - 1) != me {
-                    path.move(to: CGPoint(x: x, y: y)); path.addLine(to: CGPoint(x: x, y: y + cell))
-                }
-                if id(r + 1, c) != me {
-                    path.move(to: CGPoint(x: x, y: y + cell)); path.addLine(to: CGPoint(x: x + cell, y: y + cell))
-                }
-                if id(r, c + 1) != me {
-                    path.move(to: CGPoint(x: x + cell, y: y)); path.addLine(to: CGPoint(x: x + cell, y: y + cell))
-                }
-            }
-        }
-        return path
     }
 }
