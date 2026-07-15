@@ -15,3 +15,6 @@ xcuserdata/
 
 # Raw 3D source downloads (only the bundled .usdz in Meowdoku/Models is committed)
 art/
+
+# IP placeholder for the win screen — replace with a non-IP dancing cat before public release
+Meowdoku/Models/celebration_cat.usdz

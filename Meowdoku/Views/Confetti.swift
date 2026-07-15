@@ -99,13 +99,12 @@ struct CelebrationCat: View {
     var style: CatStyle = CatStyles.all[0]
 
     var body: some View {
-        Group {
-            if UIImage(named: "celebration_cat") != nil {
-                Image("celebration_cat").resizable().scaledToFit()
-            } else {
-                CatFace(style: style)
-            }
+        if Bundle.main.url(forResource: "celebration_cat", withExtension: "usdz") != nil {
+            CatSceneView(resource: "celebration_cat")   // animated 3D dancing cat
+        } else if UIImage(named: "celebration_cat") != nil {
+            Image("celebration_cat").resizable().scaledToFit().modifier(JumpEffect())
+        } else {
+            CatFace(style: style).modifier(JumpEffect())
         }
-        .modifier(JumpEffect())
     }
 }
