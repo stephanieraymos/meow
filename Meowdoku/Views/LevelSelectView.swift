@@ -28,7 +28,7 @@ struct LevelSelectView: View {
             Label("\(profile.totalStars) stars", systemImage: "star.fill").foregroundStyle(.yellow)
             Spacer()
             Text("\(profile.levelsCompleted)/\(LevelCatalog.totalLevels) done")
-                .foregroundStyle(.white.opacity(0.8))
+                .foregroundStyle(MeowTheme.ink.opacity(0.8))
         }
         .font(.subheadline.bold())
         .padding(.horizontal).padding(.top, 8)
@@ -52,15 +52,15 @@ struct LevelSelectView: View {
     private func tile(_ level: Int, stars: Int, completed: Bool, unlocked: Bool) -> some View {
         VStack(spacing: 4) {
             if unlocked {
-                Text("\(level)").font(.title3.bold()).foregroundStyle(.white)
+                Text("\(level)").font(.title3.bold()).foregroundStyle(MeowTheme.ink)
             } else {
-                Image(systemName: "lock.fill").font(.body).foregroundStyle(.white.opacity(0.5))
+                Image(systemName: "lock.fill").font(.body).foregroundStyle(MeowTheme.ink.opacity(0.5))
             }
             HStack(spacing: 1) {
                 ForEach(0..<3, id: \.self) { i in
                     Image(systemName: i < stars ? "star.fill" : "star")
                         .font(.system(size: 8))
-                        .foregroundStyle(i < stars ? .yellow : .white.opacity(0.25))
+                        .foregroundStyle(i < stars ? .yellow : MeowTheme.ink.opacity(0.25))
                 }
             }
         }
@@ -69,7 +69,7 @@ struct LevelSelectView: View {
         .background(
             RoundedRectangle(cornerRadius: 14)
                 .fill(completed ? Color.pink.opacity(0.35)
-                      : unlocked ? Color.white.opacity(0.14) : Color.white.opacity(0.05))
+                      : unlocked ? MeowTheme.ink.opacity(0.14) : MeowTheme.ink.opacity(0.05))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14)

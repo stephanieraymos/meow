@@ -30,15 +30,45 @@ enum MeowTheme {
     static let gridLine = Color.black.opacity(0.16)
     static let regionBorder = Color.black.opacity(0.55)
 
-    /// A warm, playful gradient used behind menus and result screens.
+    /// Primary text/foreground — white in dark mode, near-black in light mode.
+    static let ink = Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark ? .white : UIColor(white: 0.13, alpha: 1)
+    })
+    /// Translucent card fill that reads on either backdrop.
+    static let panel = Color(uiColor: UIColor { t in
+        t.userInterfaceStyle == .dark
+            ? UIColor(white: 1, alpha: 0.12)
+            : UIColor(red: 0.32, green: 0.22, blue: 0.42, alpha: 0.09)
+    })
+
+    /// A warm, playful gradient behind menus and result screens — plum in dark
+    /// mode, soft lavender in light mode.
     static var backdrop: LinearGradient {
         LinearGradient(
             colors: [
-                Color(red: 0.16, green: 0.13, blue: 0.24),
-                Color(red: 0.28, green: 0.18, blue: 0.30),
+                Color(uiColor: UIColor { t in t.userInterfaceStyle == .dark
+                    ? UIColor(red: 0.16, green: 0.13, blue: 0.24, alpha: 1)
+                    : UIColor(red: 0.97, green: 0.95, blue: 0.99, alpha: 1) }),
+                Color(uiColor: UIColor { t in t.userInterfaceStyle == .dark
+                    ? UIColor(red: 0.28, green: 0.18, blue: 0.30, alpha: 1)
+                    : UIColor(red: 0.90, green: 0.89, blue: 0.98, alpha: 1) }),
             ],
             startPoint: .top, endPoint: .bottom
         )
+    }
+}
+
+/// User-selectable appearance.
+enum Appearance: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
     }
 }
 

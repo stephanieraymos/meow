@@ -51,10 +51,10 @@ struct HomeView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
-            .tint(.white)
+            .tint(MeowTheme.ink)
             .navigationDestination(item: $route) { route in destination(route) }
         }
-        .tint(.white)
+        .tint(MeowTheme.ink)
         .fullScreenCover(isPresented: $showTutorial) { TutorialView() }
         .onAppear { if !profile.tutorialSeen { showTutorial = true } }
     }
@@ -78,15 +78,15 @@ struct HomeView: View {
             Text("🐱").font(.system(size: 72))
             Text("Meowdoku")
                 .font(.system(size: 40, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(MeowTheme.ink)
             Text("One cat per row, column & color. No two cats touch.")
-                .font(.footnote).foregroundStyle(.white.opacity(0.7))
+                .font(.footnote).foregroundStyle(MeowTheme.ink.opacity(0.7))
                 .multilineTextAlignment(.center)
             Button { showTutorial = true } label: {
                 Label("How to play", systemImage: "questionmark.circle")
                     .font(.footnote.bold())
             }
-            .tint(.white).padding(.top, 2)
+            .tint(MeowTheme.ink).padding(.top, 2)
         }
         .padding(.top, 8)
     }
@@ -136,10 +136,10 @@ struct HomeView: View {
             Spacer()
             Image(systemName: "chevron.right").opacity(0.5)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(MeowTheme.ink)
         .padding(18)
         .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
+        .background(MeowTheme.ink.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func smallCard(icon: String, title: String, tint: Color, action: @escaping () -> Void) -> some View {
@@ -148,10 +148,10 @@ struct HomeView: View {
                 Image(systemName: icon).font(.title2).foregroundStyle(tint)
                 Text(title).font(.subheadline.bold())
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(MeowTheme.ink)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
-            .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
+            .background(MeowTheme.ink.opacity(0.12), in: RoundedRectangle(cornerRadius: 18))
         }
     }
 }

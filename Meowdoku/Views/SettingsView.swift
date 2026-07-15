@@ -11,6 +11,14 @@ struct SettingsView: View {
             MeowTheme.backdrop.ignoresSafeArea()
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    section("Appearance") {
+                        Picker("Appearance", selection: Binding(
+                            get: { profile.appearance }, set: { profile.appearance = $0 })) {
+                            ForEach(Appearance.allCases) { a in Text(a.title).tag(a) }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+
                     section("Cat piece") {
                         LazyVGrid(columns: styleColumns, spacing: 10) {
                             ForEach(CatStyles.all) { style in
@@ -23,7 +31,7 @@ struct SettingsView: View {
                                         .frame(width: 54, height: 54)
                                         .background(
                                             RoundedRectangle(cornerRadius: 12)
-                                                .fill(profile.catStyleID == style.id ? Color.pink.opacity(0.5) : Color.white.opacity(0.12))
+                                                .fill(profile.catStyleID == style.id ? Color.pink.opacity(0.5) : MeowTheme.ink.opacity(0.12))
                                         )
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 12)
@@ -38,7 +46,7 @@ struct SettingsView: View {
                         toggle("Auto-mark X's", systemImage: "xmark.square.fill", isOn: Binding(
                             get: { profile.autoMarkOn }, set: { profile.autoMarkOn = $0 }))
                         Text("When you place a cat, automatically X out the cells it rules out. Solo modes only.")
-                            .font(.caption).foregroundStyle(.white.opacity(0.55))
+                            .font(.caption).foregroundStyle(MeowTheme.ink.opacity(0.55))
                     }
 
                     section("Feedback") {
@@ -56,7 +64,7 @@ struct SettingsView: View {
                                 else { Reminders.disable() }
                             }))
                         Text("A gentle nudge at 7pm when today's puzzle is still unsolved — never when you've already played.")
-                            .font(.caption).foregroundStyle(.white.opacity(0.55))
+                            .font(.caption).foregroundStyle(MeowTheme.ink.opacity(0.55))
                     }
 
                     section("Stats") {
@@ -67,7 +75,7 @@ struct SettingsView: View {
                         statRow("Daily streak", "🔥 \(profile.dailyStreak) (best \(profile.dailyBestStreak))")
                         Button { showGameCenter = true } label: {
                             Label("Game Center", systemImage: "trophy.fill")
-                                .foregroundStyle(.white).frame(maxWidth: .infinity, alignment: .leading)
+                                .foregroundStyle(MeowTheme.ink).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.top, 4)
                     }
@@ -82,26 +90,26 @@ struct SettingsView: View {
 
     @ViewBuilder private func section(_ title: String, @ViewBuilder _ content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased()).font(.caption.bold()).foregroundStyle(.white.opacity(0.6))
+            Text(title.uppercased()).font(.caption.bold()).foregroundStyle(MeowTheme.ink.opacity(0.6))
             content()
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
+        .background(MeowTheme.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func toggle(_ title: String, systemImage: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
-            Label(title, systemImage: systemImage).foregroundStyle(.white)
+            Label(title, systemImage: systemImage).foregroundStyle(MeowTheme.ink)
         }
         .tint(.pink)
     }
 
     private func statRow(_ label: String, _ value: String) -> some View {
         HStack {
-            Text(label).foregroundStyle(.white.opacity(0.8))
+            Text(label).foregroundStyle(MeowTheme.ink.opacity(0.8))
             Spacer()
-            Text(value).foregroundStyle(.white).bold()
+            Text(value).foregroundStyle(MeowTheme.ink).bold()
         }
         .font(.subheadline)
     }

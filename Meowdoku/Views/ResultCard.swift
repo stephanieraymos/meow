@@ -22,12 +22,20 @@ struct ResultCard: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.55).ignoresSafeArea()
+            if won { ConfettiView().ignoresSafeArea() }
             VStack(spacing: 16) {
-                Text(won ? MeowTheme.winGlyph : MeowTheme.loseGlyph)
-                    .font(.system(size: 68))
-                    .scaleEffect(bounce ? 1.0 : 0.6)
-                    .rotationEffect(.degrees(won && bounce ? 0 : -8))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.4), value: bounce)
+                Group {
+                    if won {
+                        CelebrationCat(style: PlayerProfile.shared.catStyle)
+                            .frame(width: 128, height: 128)
+                    } else {
+                        Text(MeowTheme.loseGlyph)
+                            .font(.system(size: 68))
+                            .scaleEffect(bounce ? 1.0 : 0.6)
+                            .rotationEffect(.degrees(bounce ? -8 : 4))
+                            .animation(.spring(response: 0.5, dampingFraction: 0.4), value: bounce)
+                    }
+                }
 
                 Text(title).font(.title.bold()).foregroundStyle(.white)
                 Text(subtitle)

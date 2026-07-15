@@ -43,10 +43,10 @@ struct TutorialView: View {
 
     private var header: some View {
         HStack {
-            Text("How to play").font(.headline).foregroundStyle(.white)
+            Text("How to play").font(.headline).foregroundStyle(MeowTheme.ink)
             Spacer()
             Text("\(session.progress)/\(session.size)")
-                .font(.subheadline.monospacedDigit()).foregroundStyle(.white.opacity(0.8))
+                .font(.subheadline.monospacedDigit()).foregroundStyle(MeowTheme.ink.opacity(0.8))
         }
     }
 
@@ -54,13 +54,13 @@ struct TutorialView: View {
         HStack(alignment: .top, spacing: 10) {
             Text("🐱").font(.title)
             Text(message)
-                .font(.callout).foregroundStyle(.white)
+                .font(.callout).foregroundStyle(MeowTheme.ink)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+        .background(MeowTheme.ink.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
     }
 
     private var message: String {
@@ -94,7 +94,7 @@ struct TutorialView: View {
             profile.tutorialSeen = true
             dismiss()
         } label: {
-            Text("Skip").foregroundStyle(.white.opacity(0.7))
+            Text("Skip").foregroundStyle(MeowTheme.ink.opacity(0.7))
         }
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct MeowdokuApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @ObservedObject private var profile = PlayerProfile.shared
 
     init() {
         GameCenter.shared.authenticate()
@@ -12,7 +13,7 @@ struct MeowdokuApp: App {
     var body: some Scene {
         WindowGroup {
             HomeView()
-                .preferredColorScheme(.dark)
+                .preferredColorScheme(profile.appearance.colorScheme)
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Reminders.refresh() }

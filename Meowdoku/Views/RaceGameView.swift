@@ -20,11 +20,11 @@ struct RaceGameView: View {
                         .padding(.horizontal, 8)
                         .disabled(store.phase != .playing)
                     Text("Double-tap to place a cat · tap or drag to mark X")
-                        .font(.caption2).foregroundStyle(.white.opacity(0.55))
+                        .font(.caption2).foregroundStyle(MeowTheme.ink.opacity(0.55))
                 }
                 .padding()
             } else {
-                ProgressView().tint(.white)
+                ProgressView().tint(MeowTheme.ink)
             }
 
             if store.phase == .countdown { countdownOverlay }
@@ -47,14 +47,14 @@ struct RaceGameView: View {
     private func progressRow(name: String, value: Int, total: Int, alive: Bool, mine: Bool) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(name).font(.subheadline.bold()).foregroundStyle(.white)
+                Text(name).font(.subheadline.bold()).foregroundStyle(MeowTheme.ink)
                 if !alive { Text("💥 out").font(.caption).foregroundStyle(.orange) }
                 Spacer()
-                Text("\(value)/\(total)").font(.subheadline.monospacedDigit()).foregroundStyle(.white.opacity(0.9))
+                Text("\(value)/\(total)").font(.subheadline.monospacedDigit()).foregroundStyle(MeowTheme.ink.opacity(0.9))
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.18))
+                    Capsule().fill(MeowTheme.ink.opacity(0.18))
                     Capsule()
                         .fill(mine ? Color.pink : Color.cyan)
                         .frame(width: geo.size.width * CGFloat(value) / CGFloat(max(total, 1)))
@@ -71,10 +71,10 @@ struct RaceGameView: View {
         ZStack {
             Color.black.opacity(0.5).ignoresSafeArea()
             VStack(spacing: 8) {
-                Text("Get ready…").font(.title3).foregroundStyle(.white.opacity(0.85))
+                Text("Get ready…").font(.title3).foregroundStyle(Color.white.opacity(0.85))
                 Text("\(store.countdownValue)")
                     .font(.system(size: 96, weight: .heavy))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.white)
                     .contentTransition(.numericText())
                     .animation(.snappy, value: store.countdownValue)
             }
@@ -95,7 +95,7 @@ struct RaceGameView: View {
     private var rematchStatus: AnyView? {
         if store.rematchOffered {
             return AnyView(Label("Waiting for \(displayOpp) to accept…", systemImage: "hourglass")
-                .font(.footnote).foregroundStyle(.white.opacity(0.85)))
+                .font(.footnote).foregroundStyle(MeowTheme.ink.opacity(0.85)))
         }
         if store.opponentWantsRematch {
             return AnyView(Label("\(displayOpp) wants a rematch!", systemImage: "flame.fill")
@@ -110,7 +110,7 @@ struct RaceGameView: View {
             let title = store.opponentWantsRematch ? "Accept rematch" : "Rematch"
             buttons.append(ResultButton(title: title, style: .prominent, tint: .pink) { store.rematch() })
         }
-        buttons.append(ResultButton(title: "Back to lobby", style: .bordered, tint: .white) { store.reset() })
+        buttons.append(ResultButton(title: "Back to lobby", style: .bordered, tint: MeowTheme.ink) { store.reset() })
         return buttons
     }
 

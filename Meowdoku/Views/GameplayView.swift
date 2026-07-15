@@ -76,11 +76,11 @@ private struct GameBoardScreen: View {
         HStack {
             Button { onExit() } label: { Image(systemName: "chevron.left").font(.headline) }
             Spacer()
-            Text(mode.title).font(.headline).foregroundStyle(.white)
+            Text(mode.title).font(.headline).foregroundStyle(MeowTheme.ink)
             Spacer()
             Button { onExit() } label: { Image(systemName: "xmark").font(.headline) }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(MeowTheme.ink)
     }
 
     private var header: some View {
@@ -89,17 +89,17 @@ private struct GameBoardScreen: View {
                 hearts
                 Spacer()
                 Label("\(session.progress)/\(session.size)", systemImage: "pawprint.fill")
-                    .font(.subheadline.monospacedDigit()).foregroundStyle(.white)
+                    .font(.subheadline.monospacedDigit()).foregroundStyle(MeowTheme.ink)
                 if mode.showsTimer {
                     Spacer()
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         Label(timeString(session.elapsed), systemImage: "clock")
-                            .font(.subheadline.monospacedDigit()).foregroundStyle(.white.opacity(0.85))
+                            .font(.subheadline.monospacedDigit()).foregroundStyle(MeowTheme.ink.opacity(0.85))
                     }
                 }
             }
             Text("Double-tap = cat · tap = X · drag = mark · no hints in races")
-                .font(.caption2).foregroundStyle(.white.opacity(0.55))
+                .font(.caption2).foregroundStyle(MeowTheme.ink.opacity(0.55))
         }
     }
 
@@ -107,7 +107,7 @@ private struct GameBoardScreen: View {
         HStack(spacing: 3) {
             ForEach(0..<mode.allowedMistakes, id: \.self) { i in
                 Image(systemName: i < session.heartsRemaining ? "heart.fill" : "heart")
-                    .foregroundStyle(i < session.heartsRemaining ? .pink : .white.opacity(0.3))
+                    .foregroundStyle(i < session.heartsRemaining ? .pink : MeowTheme.ink.opacity(0.3))
                     .font(.subheadline)
             }
         }
@@ -123,7 +123,7 @@ private struct GameBoardScreen: View {
                 Spacer(minLength: 0)
             }
             .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+            .background(Color(white: 0.98), in: RoundedRectangle(cornerRadius: 18))
             .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
             .padding(.horizontal, 18)
             .padding(.top, 96)
@@ -138,7 +138,7 @@ private struct GameBoardScreen: View {
                 Button { session.dismissHint() } label: {
                     Text("Dismiss").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered).tint(.white)
+                .buttonStyle(.bordered).tint(MeowTheme.ink)
 
                 Button {
                     hint.canApply ? session.applyHint() : session.dismissHint()
@@ -153,7 +153,7 @@ private struct GameBoardScreen: View {
                 Button { session.undo() } label: {
                     Label("Undo", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered).tint(.white)
+                .buttonStyle(.bordered).tint(MeowTheme.ink)
                 .disabled(!session.canUndo)
 
                 if mode.hintsAllowed {
@@ -187,7 +187,7 @@ private struct GameBoardScreen: View {
                 Label("Share result", systemImage: "square.and.arrow.up")
                     .font(.subheadline.bold())
             }
-            .tint(.white)
+            .tint(MeowTheme.ink)
         }
     }
 
@@ -204,7 +204,8 @@ private struct GameBoardScreen: View {
     }
 
     private var resultTitle: String {
-        session.isWon ? "Purr-fect! 🎉" : "Out of hearts"
+        guard session.isWon else { return "Out of hearts" }
+        return earnedStars == 3 ? "Flawless!" : "Purr-fect!"
     }
 
     private var resultSubtitle: String {
@@ -223,13 +224,13 @@ private struct GameBoardScreen: View {
         var buttons: [ResultButton] = []
         if session.isWon, let onNext {
             buttons.append(ResultButton(title: "Next level", style: .prominent, tint: .green, action: onNext))
-            buttons.append(ResultButton(title: "Replay", style: .bordered, tint: .white, action: onReplay))
+            buttons.append(ResultButton(title: "Replay", style: .bordered, tint: MeowTheme.ink, action: onReplay))
         } else {
             buttons.append(ResultButton(
                 title: session.isWon ? "Play again" : "Try again",
                 style: .prominent, tint: session.isWon ? .green : .orange, action: onReplay))
         }
-        buttons.append(ResultButton(title: "Back", style: .bordered, tint: .white, action: onExit))
+        buttons.append(ResultButton(title: "Back", style: .bordered, tint: MeowTheme.ink, action: onExit))
         return buttons
     }
 
@@ -281,7 +282,7 @@ struct StarRow: View {
         HStack(spacing: 6) {
             ForEach(0..<3, id: \.self) { i in
                 Image(systemName: i < stars ? "star.fill" : "star")
-                    .foregroundStyle(i < stars ? .yellow : .white.opacity(0.3))
+                    .foregroundStyle(i < stars ? .yellow : MeowTheme.ink.opacity(0.3))
                     .font(.title3)
             }
         }

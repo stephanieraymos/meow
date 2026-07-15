@@ -29,9 +29,9 @@ struct RaceLobbyView: View {
                     Text("🐈‍⬛ 🆚 🐈")
                         .font(.system(size: 40))
                     Text("Race Audie")
-                        .font(.largeTitle.bold()).foregroundStyle(.white)
+                        .font(.largeTitle.bold()).foregroundStyle(MeowTheme.ink)
                     Text("Same puzzle, two boards. First to place every cat wins.\nOne wrong cat and you're out.")
-                        .font(.callout).foregroundStyle(.white.opacity(0.75))
+                        .font(.callout).foregroundStyle(MeowTheme.ink.opacity(0.75))
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 12)
@@ -44,7 +44,7 @@ struct RaceLobbyView: View {
 
                 // Create
                 card {
-                    Text("Start a new race").font(.headline).foregroundStyle(.white)
+                    Text("Start a new race").font(.headline).foregroundStyle(MeowTheme.ink)
                     Picker("Difficulty", selection: $difficulty) {
                         ForEach(Difficulty.allCases) { d in
                             Text("\(d.title) · \(d.subtitle)").tag(d)
@@ -55,7 +55,7 @@ struct RaceLobbyView: View {
                         Task { await store.createMatch(name: playerName, size: difficulty.size) }
                     } label: {
                         HStack {
-                            if store.busy { ProgressView().tint(.white) }
+                            if store.busy { ProgressView().tint(MeowTheme.ink) }
                             Text("Create game").bold()
                         }.frame(maxWidth: .infinity)
                     }
@@ -65,14 +65,14 @@ struct RaceLobbyView: View {
 
                 // Join
                 card {
-                    Text("Join with a code").font(.headline).foregroundStyle(.white)
+                    Text("Join with a code").font(.headline).foregroundStyle(MeowTheme.ink)
                     TextField("CODE", text: $joinCode)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .font(.title2.monospaced())
                         .multilineTextAlignment(.center)
                         .padding(10)
-                        .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                        .background(MeowTheme.ink.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
                         .onChange(of: joinCode) { _, v in joinCode = String(v.uppercased().prefix(6)) }
                     Button {
                         Task { await store.joinMatch(name: playerName, code: joinCode) }
@@ -99,10 +99,10 @@ struct RaceLobbyView: View {
         VStack(spacing: 24) {
             Spacer()
             Text("Share this code with Audie")
-                .font(.headline).foregroundStyle(.white.opacity(0.85))
+                .font(.headline).foregroundStyle(MeowTheme.ink.opacity(0.85))
             Text(store.match?.code ?? "…")
                 .font(.system(size: 64, weight: .heavy, design: .monospaced))
-                .foregroundStyle(.white)
+                .foregroundStyle(MeowTheme.ink)
                 .tracking(6)
             if let code = store.match?.code {
                 ShareLink(item: "Join my Meowdoku race! Code: \(code)") {
@@ -110,10 +110,10 @@ struct RaceLobbyView: View {
                 }.tint(.pink)
             }
             ProgressView("Waiting for Audie to join…")
-                .tint(.white).foregroundStyle(.white).padding(.top, 8)
+                .tint(MeowTheme.ink).foregroundStyle(MeowTheme.ink).padding(.top, 8)
             Spacer()
             Button("Cancel", role: .destructive) { store.leave() }
-                .buttonStyle(.bordered).tint(.white)
+                .buttonStyle(.bordered).tint(MeowTheme.ink)
         }
         .padding()
     }
@@ -122,18 +122,18 @@ struct RaceLobbyView: View {
 
     @ViewBuilder private func field(_ label: String, @ViewBuilder _ content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(label).font(.subheadline).foregroundStyle(.white.opacity(0.8))
+            Text(label).font(.subheadline).foregroundStyle(MeowTheme.ink.opacity(0.8))
             content()
                 .textFieldStyle(.plain)
                 .padding(12)
-                .background(.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
-                .foregroundStyle(.white)
+                .background(MeowTheme.ink.opacity(0.14), in: RoundedRectangle(cornerRadius: 10))
+                .foregroundStyle(MeowTheme.ink)
         }
     }
 
     @ViewBuilder private func card(@ViewBuilder _ content: () -> some View) -> some View {
         VStack(spacing: 12, content: content)
             .padding(16)
-            .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+            .background(MeowTheme.ink.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
     }
 }

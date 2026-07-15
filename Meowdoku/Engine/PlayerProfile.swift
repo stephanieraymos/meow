@@ -22,6 +22,7 @@ final class PlayerProfile: ObservableObject {
         var autoMarkOn: Bool = true
         var tutorialSeen: Bool = false
         var remindersOn: Bool = false
+        var appearance: String = "dark"
 
         init() {}
 
@@ -47,6 +48,7 @@ final class PlayerProfile: ObservableObject {
             autoMarkOn = v(.autoMarkOn, true)
             tutorialSeen = v(.tutorialSeen, false)
             remindersOn = v(.remindersOn, false)
+            appearance = v(.appearance, "dark")
         }
     }
 
@@ -157,5 +159,9 @@ final class PlayerProfile: ObservableObject {
     var remindersOn: Bool {
         get { data.remindersOn }
         set { data.remindersOn = newValue }
+    }
+    var appearance: Appearance {
+        get { Appearance(rawValue: data.appearance) ?? .dark }
+        set { data.appearance = newValue.rawValue }
     }
 }
