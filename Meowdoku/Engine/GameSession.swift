@@ -15,8 +15,8 @@ struct Hint: Equatable {
         case focus     // just highlight `targets` (a color/row that's nearly solved)
     }
     let kind: Kind
-    let spotlight: GameSession.Cell?  // an existing cat being reasoned about
-    let targets: [GameSession.Cell]   // exclude: empties to X · focus: cells to highlight
+    let highlight: [GameSession.Cell]  // the "cause" cells the reasoning points at
+    let targets: [GameSession.Cell]    // exclude: empties to X · focus: cells to highlight
     let reason: String
     var canApply: Bool { kind == .exclude }
 }
@@ -159,91 +159,169 @@ final class GameSession: ObservableObject {
     @discardableResult
     func hint() -> Hint? {
         guard !isOver else { return nil }
+        // Candidate = an empty square that could still hold a cat given the cats
+        // already placed (ignores the player's own X notes).
+        var possible = [[Bool]](repeating: [Bool](repeating: false, count: size), count: size)
+        for r in 0..<size { for c in 0..<size { possible[r][c] = marks[r][c] == .empty && canHoldCat(r, c) } }
 
-        // A cell can still hold a cat only if no placed cat shares its row,
-        // column, region, or touches it. (Ignores the player's X notes.)
-        func canHoldCat(_ r: Int, _ c: Int) -> Bool {
-            if marks[r][c] == .cat { return false }
-            for i in 0..<size where marks[r][i] == .cat { return false }
-            for i in 0..<size where marks[i][c] == .cat { return false }
-            let region = board.regionID(row: r, col: c)
-            for rr in 0..<size {
-                for cc in 0..<size where marks[rr][cc] == .cat && board.regionID(row: rr, col: cc) == region { return false }
-            }
-            for dr in -1...1 { for dc in -1...1 {
-                let nr = r + dr, nc = c + dc
-                if nr >= 0, nr < size, nc >= 0, nc < size, marks[nr][nc] == .cat { return false }
-            } }
-            return true
-        }
-        // 1) Exclusion around a placed cat (the reference hint): X the empty
-        //    squares still open in its row, column or neighbours.
-        var bestCat: Cell? = nil; var bestTargets: [Cell] = []
-        for r in 0..<size { for c in 0..<size where marks[r][c] == .cat {
-            var targets: [Cell] = []
-            for i in 0..<size {
-                if marks[r][i] == .empty { targets.append(Cell(row: r, col: i)) }
-                if marks[i][c] == .empty { targets.append(Cell(row: i, col: c)) }
-            }
-            for dr in -1...1 { for dc in -1...1 {
-                let nr = r + dr, nc = c + dc
-                if nr >= 0, nr < size, nc >= 0, nc < size, marks[nr][nc] == .empty { targets.append(Cell(row: nr, col: nc)) }
-            } }
-            var seen = Set<Int>(); targets = targets.filter { seen.insert($0.row * size + $0.col).inserted }
-            if targets.count > bestTargets.count { bestTargets = targets; bestCat = Cell(row: r, col: c) }
+        // Solving techniques, simplest (most teachable) first.
+        return basicElimination()
+            ?? lockedInLine(possible)
+            ?? nakedSubset(possible, byColumn: true)
+            ?? nakedSubset(possible, byColumn: false)
+            ?? focusFallback(possible)
+    }
+
+    /// A square can still hold a cat only if no placed cat shares its row, column
+    /// or color, or touches it.
+    private func canHoldCat(_ r: Int, _ c: Int) -> Bool {
+        if marks[r][c] == .cat { return false }
+        for i in 0..<size where marks[r][i] == .cat { return false }
+        for i in 0..<size where marks[i][c] == .cat { return false }
+        let region = board.regionID(row: r, col: c)
+        for rr in 0..<size { for cc in 0..<size where marks[rr][cc] == .cat && board.regionID(row: rr, col: cc) == region { return false } }
+        for dr in -1...1 { for dc in -1...1 {
+            let nr = r + dr, nc = c + dc
+            if nr >= 0, nr < size, nc >= 0, nc < size, marks[nr][nc] == .cat { return false }
         } }
-        if let cat = bestCat, !bestTargets.isEmpty {
-            return set(.init(kind: .exclude, spotlight: cat, targets: bestTargets,
-                             reason: "This cat's row, column and neighbours can't hold another cat — rule them out."))
-        }
+        return true
+    }
 
-        // 2) Region narrowing: a color with empty squares no cat can reach.
-        //    X them so the one remaining square stands out on its own.
-        for region in 0..<size where !regionHasCat(region) {
-            var blockable: [Cell] = []
-            for r in 0..<size { for c in 0..<size
-                where board.regionID(row: r, col: c) == region && marks[r][c] == .empty && !canHoldCat(r, c) {
-                blockable.append(Cell(row: r, col: c))
+    /// Technique 1 — a row / column / color that already holds a cat rules out its
+    /// remaining empty squares (and squares touching a cat are out).
+    private func basicElimination() -> Hint? {
+        var best: (targets: [Cell], highlight: [Cell], reason: String)?
+        func consider(_ targets: [Cell], _ highlight: [Cell], _ reason: String) {
+            guard !targets.isEmpty else { return }
+            if best == nil || targets.count > best!.targets.count { best = (targets, highlight, reason) }
+        }
+        for r in 0..<size where rowCat(r) != nil {
+            consider((0..<size).filter { marks[r][$0] == .empty }.map { Cell(row: r, col: $0) },
+                     [rowCat(r)!], "A cat can't go in these — row \(r + 1) already has a cat.")
+        }
+        for c in 0..<size where colCat(c) != nil {
+            consider((0..<size).filter { marks[$0][c] == .empty }.map { Cell(row: $0, col: c) },
+                     [colCat(c)!], "A cat can't go in these — column \(c + 1) already has a cat.")
+        }
+        for region in 0..<size where regionCat(region) != nil {
+            var empties: [Cell] = []
+            for r in 0..<size { for c in 0..<size where board.regionID(row: r, col: c) == region && marks[r][c] == .empty { empties.append(Cell(row: r, col: c)) } }
+            consider(empties, [regionCat(region)!], "A cat can't go in these — this color already has its cat.")
+        }
+        for r in 0..<size { for c in 0..<size where marks[r][c] == .cat {
+            var neighbours: [Cell] = []
+            for dr in -1...1 { for dc in -1...1 where !(dr == 0 && dc == 0) {
+                let nr = r + dr, nc = c + dc
+                if nr >= 0, nr < size, nc >= 0, nc < size, marks[nr][nc] == .empty { neighbours.append(Cell(row: nr, col: nc)) }
             } }
-            if !blockable.isEmpty {
-                return set(.init(kind: .exclude, spotlight: nil, targets: blockable,
-                                 reason: "No cat can reach these squares in this color — rule them out to narrow it down."))
-            }
-        }
+            consider(neighbours, [Cell(row: r, col: c)], "A cat can't go here — it would touch the cat beside it.")
+        } }
+        guard let b = best else { return nil }
+        return set(.init(kind: .exclude, highlight: b.highlight, targets: b.targets, reason: b.reason))
+    }
 
-        // 3) Focus: a color that's down to one open square — highlight it so the
-        //    player spots the forced cat themselves (never placed for them).
-        for region in 0..<size where !regionHasCat(region) {
-            let cells = regionCells(region)
-            let open = cells.filter { marks[$0.row][$0.col] == .empty }
-            if open.count == 1 {
-                return set(.init(kind: .focus, spotlight: nil, targets: cells,
-                                 reason: "This color is down to one open square — can you see where its cat goes?"))
+    /// Technique 2 — locked candidates. If a color's only remaining squares sit in
+    /// one row (or column), that line belongs to it, so no other cat can take it.
+    private func lockedInLine(_ possible: [[Bool]]) -> Hint? {
+        for region in 0..<size where regionCat(region) == nil {
+            var cells: [Cell] = []
+            for r in 0..<size { for c in 0..<size where possible[r][c] && board.regionID(row: r, col: c) == region { cells.append(Cell(row: r, col: c)) } }
+            guard let first = cells.first else { continue }
+            if cells.allSatisfy({ $0.row == first.row }) {
+                let r = first.row
+                let targets = (0..<size).compactMap { c in possible[r][c] && board.regionID(row: r, col: c) != region ? Cell(row: r, col: c) : nil }
+                if !targets.isEmpty {
+                    return set(.init(kind: .exclude, highlight: cells, targets: targets,
+                                     reason: "This color's cat can only go in row \(r + 1), so no other cat can take that row."))
+                }
             }
-        }
-        // 4) Focus fallback: the most-constrained color.
-        var smallest: (region: Int, open: Int, cells: [Cell])? = nil
-        for region in 0..<size where !regionHasCat(region) {
-            let cells = regionCells(region)
-            let open = cells.filter { marks[$0.row][$0.col] == .empty }.count
-            if open > 0, smallest == nil || open < smallest!.open { smallest = (region, open, cells) }
-        }
-        if let s = smallest {
-            return set(.init(kind: .focus, spotlight: nil, targets: s.cells,
-                             reason: "Fewest squares means fewest choices — reason about this color next."))
+            if cells.allSatisfy({ $0.col == first.col }) {
+                let c = first.col
+                let targets = (0..<size).compactMap { r in possible[r][c] && board.regionID(row: r, col: c) != region ? Cell(row: r, col: c) : nil }
+                if !targets.isEmpty {
+                    return set(.init(kind: .exclude, highlight: cells, targets: targets,
+                                     reason: "This color's cat can only go in column \(c + 1), so no other cat can take that column."))
+                }
+            }
         }
         return nil
     }
 
-    private func regionHasCat(_ region: Int) -> Bool {
-        for r in 0..<size { for c in 0..<size
-            where board.regionID(row: r, col: c) == region && marks[r][c] == .cat { return true } }
-        return false
+    /// Technique 3 — naked subsets. If K colors' remaining squares fit within
+    /// exactly K columns (or rows), those lines are claimed, so no other cat can
+    /// go in them. (This is the "N colors share N cols" deduction.)
+    private func nakedSubset(_ possible: [[Bool]], byColumn: Bool) -> Hint? {
+        var linesByColor: [Int: Set<Int>] = [:]
+        var cellsByColor: [Int: [Cell]] = [:]
+        for region in 0..<size where regionCat(region) == nil {
+            var ls = Set<Int>(); var cs: [Cell] = []
+            for r in 0..<size { for c in 0..<size where possible[r][c] && board.regionID(row: r, col: c) == region {
+                ls.insert(byColumn ? c : r); cs.append(Cell(row: r, col: c))
+            } }
+            if !ls.isEmpty { linesByColor[region] = ls; cellsByColor[region] = cs }
+        }
+        let colors = linesByColor.keys.sorted()
+        for k in 2...3 where k <= colors.count {
+            for combo in combinations(colors, k) {
+                var union = Set<Int>()
+                for color in combo { union.formUnion(linesByColor[color]!) }
+                guard union.count == k else { continue }
+                let comboSet = Set(combo)
+                var targets: [Cell] = []
+                for r in 0..<size { for c in 0..<size where possible[r][c] {
+                    if union.contains(byColumn ? c : r), !comboSet.contains(board.regionID(row: r, col: c)) { targets.append(Cell(row: r, col: c)) }
+                } }
+                if !targets.isEmpty {
+                    return set(.init(kind: .exclude, highlight: combo.flatMap { cellsByColor[$0]! }, targets: targets,
+                                     reason: "\(k) colors can only fit in these \(k) \(byColumn ? "columns" : "rows"), so no other cat can go there."))
+                }
+            }
+        }
+        return nil
+    }
+
+    /// Nothing left to rule out — point at the most-constrained color.
+    private func focusFallback(_ possible: [[Bool]]) -> Hint? {
+        for region in 0..<size where regionCat(region) == nil {
+            let cells = regionCells(region)
+            if cells.filter({ possible[$0.row][$0.col] }).count == 1 {
+                return set(.init(kind: .focus, highlight: cells, targets: cells,
+                                 reason: "This color has only one square a cat can still go — can you spot it?"))
+            }
+        }
+        var smallest: (open: Int, cells: [Cell])?
+        for region in 0..<size where regionCat(region) == nil {
+            let cells = regionCells(region)
+            let open = cells.filter { possible[$0.row][$0.col] }.count
+            if open > 0, smallest == nil || open < smallest!.open { smallest = (open, cells) }
+        }
+        if let s = smallest {
+            return set(.init(kind: .focus, highlight: s.cells, targets: s.cells,
+                             reason: "Fewest open squares means fewest choices — reason about this color next."))
+        }
+        return nil
+    }
+
+    private func rowCat(_ r: Int) -> Cell? { for c in 0..<size where marks[r][c] == .cat { return Cell(row: r, col: c) }; return nil }
+    private func colCat(_ c: Int) -> Cell? { for r in 0..<size where marks[r][c] == .cat { return Cell(row: r, col: c) }; return nil }
+    private func regionCat(_ region: Int) -> Cell? {
+        for r in 0..<size { for c in 0..<size where marks[r][c] == .cat && board.regionID(row: r, col: c) == region { return Cell(row: r, col: c) } }
+        return nil
     }
     private func regionCells(_ region: Int) -> [Cell] {
         var cells: [Cell] = []
         for r in 0..<size { for c in 0..<size where board.regionID(row: r, col: c) == region { cells.append(Cell(row: r, col: c)) } }
         return cells
+    }
+    private func combinations(_ arr: [Int], _ k: Int) -> [[Int]] {
+        guard k > 0, arr.count >= k else { return k == 0 ? [[]] : [] }
+        var result: [[Int]] = []
+        func go(_ start: Int, _ current: [Int]) {
+            if current.count == k { result.append(current); return }
+            for i in start..<arr.count { go(i + 1, current + [arr[i]]) }
+        }
+        go(0, [])
+        return result
     }
 
     private func set(_ hint: Hint) -> Hint {

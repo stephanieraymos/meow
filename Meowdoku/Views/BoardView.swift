@@ -101,7 +101,7 @@ struct BoardView: View {
         let id = GameSession.Cell(row: r, col: c)
         let isFault = session.faultCell == id
         let hint = session.activeHint
-        let isSpot = hint?.spotlight == id || spotlight == id
+        let isSpot = spotlight == id || (hint?.highlight.contains(id) ?? false)
         let isTarget = hint?.targets.contains(id) ?? false
         let dimmed = hint != nil && !isSpot && !isTarget
         let region = board.regionID(row: r, col: c)
