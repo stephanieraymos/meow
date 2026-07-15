@@ -24,6 +24,9 @@ targets:
       properties:
         CFBundleDisplayName: Meowdoku
         CFBundleShortVersionString: "1.0"
+        # Reference the build setting so `make ship` (which passes a timestamp as
+        # CURRENT_PROJECT_VERSION) produces a unique, ever-increasing build number.
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         UILaunchScreen: {}
         # Portrait-only. UIRequiresFullScreen opts out of iPad multitasking so a
         # single orientation is allowed on iPad (App Store validation 90474).
