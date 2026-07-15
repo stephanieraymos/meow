@@ -21,6 +21,7 @@ final class PlayerProfile: ObservableObject {
         var soundOn: Bool = true
         var autoMarkOn: Bool = true
         var tutorialSeen: Bool = false
+        var remindersOn: Bool = false
 
         init() {}
 
@@ -45,6 +46,7 @@ final class PlayerProfile: ObservableObject {
             soundOn = v(.soundOn, true)
             autoMarkOn = v(.autoMarkOn, true)
             tutorialSeen = v(.tutorialSeen, false)
+            remindersOn = v(.remindersOn, false)
         }
     }
 
@@ -151,5 +153,9 @@ final class PlayerProfile: ObservableObject {
     var tutorialSeen: Bool {
         get { data.tutorialSeen }
         set { data.tutorialSeen = newValue }
+    }
+    var remindersOn: Bool {
+        get { data.remindersOn }
+        set { data.remindersOn = newValue }
     }
 }

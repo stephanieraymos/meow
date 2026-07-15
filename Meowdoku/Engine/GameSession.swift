@@ -86,6 +86,7 @@ final class GameSession: ObservableObject {
             if autoMark { group += applyAutoMarks(row: row, col: col) }
             commit(group)
             Haptics.place()
+            SoundPlayer.shared.play(.pop)
             if correctCats == board.size { win() }
             return .placedCorrect
         }
@@ -95,6 +96,7 @@ final class GameSession: ObservableObject {
         marks[row][col] = .cat
         faultCell = Cell(row: row, col: col)
         Haptics.error()
+        SoundPlayer.shared.play(.mistake)
         if mistakes >= allowedMistakes {
             lose()                // leave the offending cat on the board, flashed red
         } else {
@@ -108,9 +110,9 @@ final class GameSession: ObservableObject {
         guard !isOver else { return }
         switch marks[row][col] {
         case .empty:
-            commit([move(row, col)]); marks[row][col] = .blocked; Haptics.light()
+            commit([move(row, col)]); marks[row][col] = .blocked; Haptics.light(); SoundPlayer.shared.play(.tick)
         case .blocked:
-            commit([move(row, col)]); marks[row][col] = .empty; Haptics.light()
+            commit([move(row, col)]); marks[row][col] = .empty; Haptics.light(); SoundPlayer.shared.play(.tick)
         case .cat:
             commit([move(row, col)])
             marks[row][col] = .empty
@@ -125,6 +127,7 @@ final class GameSession: ObservableObject {
         guard !isOver, marks[row][col] == .empty else { return }
         commit([move(row, col)])
         marks[row][col] = .blocked
+        SoundPlayer.shared.play(.tick)
     }
 
     func undo() {
@@ -170,12 +173,14 @@ final class GameSession: ObservableObject {
         finishedAt = Date()
         isWon = true
         Haptics.success()
+        SoundPlayer.shared.play(.win)
     }
 
     private func lose() {
         finishedAt = Date()
         isLost = true
         Haptics.error()
+        SoundPlayer.shared.play(.lose)
     }
 
     /// Snapshot a cell's current mark for the undo group (call *before* mutating).

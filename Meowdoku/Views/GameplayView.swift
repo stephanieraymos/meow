@@ -214,6 +214,7 @@ private struct GameBoardScreen: View {
             if i >= 50 { gc.report(GameCenter.Achievement.level50) }
         case .daily(let key):
             profile.recordDaily(key: key, solved: true)
+            Reminders.refresh()   // move the nudge to tomorrow now that today's done
             gc.submitTime(session.elapsed, leaderboardID: GameCenter.Leaderboard.daily)
             if profile.dailyStreak >= 7 { gc.report(GameCenter.Achievement.streak7) }
         case .timeAttack(let s):

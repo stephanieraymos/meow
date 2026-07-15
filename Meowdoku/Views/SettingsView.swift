@@ -48,6 +48,17 @@ struct SettingsView: View {
                             get: { profile.soundOn }, set: { profile.soundOn = $0 }))
                     }
 
+                    section("Notifications") {
+                        toggle("Daily reminder", systemImage: "bell.fill", isOn: Binding(
+                            get: { profile.remindersOn },
+                            set: { on in
+                                if on { Task { await Reminders.enable() } }
+                                else { Reminders.disable() }
+                            }))
+                        Text("A gentle nudge at 7pm when today's puzzle is still unsolved — never when you've already played.")
+                            .font(.caption).foregroundStyle(.white.opacity(0.55))
+                    }
+
                     section("Stats") {
                         statRow("Games played", "\(profile.totalGames)")
                         statRow("Wins", "\(profile.totalWins)")
