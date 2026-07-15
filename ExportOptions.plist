@@ -2,16 +2,23 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- iOS App Store / TestFlight upload. Automatic signing: with an App Store  -->
-    <!-- Connect API key and -allowProvisioningUpdates, Xcode registers the App   -->
-    <!-- ID and creates/renews the distribution profile for                       -->
-    <!-- com.stephanieraymos.meowdoku on the fly.                                 -->
+    <!-- Manual signing with a distribution profile minted via the App Store    -->
+    <!-- Connect API and installed locally (~/Library/MobileDevice/Provisioning -->
+    <!-- Profiles). This account's cloud-managed signing is disabled, so         -->
+    <!-- automatic export fails; manual signing with a pre-installed profile is  -->
+    <!-- the working path (same as Glade/Horizon). The profile name below must   -->
+    <!-- exactly match the "Name" inside the .mobileprovision.                   -->
     <key>method</key>
     <string>app-store-connect</string>
     <key>teamID</key>
     <string>FZ5HL2XU6U</string>
     <key>signingStyle</key>
-    <string>automatic</string>
+    <string>manual</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>com.stephanieraymos.meowdoku</key>
+        <string>Meowdoku App Store CLI</string>
+    </dict>
     <key>uploadSymbols</key>
     <true/>
     <key>compileBitcode</key>
