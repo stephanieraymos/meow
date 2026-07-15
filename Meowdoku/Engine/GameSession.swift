@@ -7,6 +7,20 @@ enum CellMark: Equatable {
     case blocked  // an "X" note: player has ruled this cell out
 }
 
+/// A guided hint. Hints never reveal where a cat goes — they show which squares
+/// can be ruled out (X'd) and explain why, leading the player to deduce the cat.
+struct Hint: Equatable {
+    enum Kind {
+        case exclude   // X out `targets`; "Apply" marks them
+        case focus     // just highlight `targets` (a color/row that's nearly solved)
+    }
+    let kind: Kind
+    let spotlight: GameSession.Cell?  // an existing cat being reasoned about
+    let targets: [GameSession.Cell]   // exclude: empties to X · focus: cells to highlight
+    let reason: String
+    var canApply: Bool { kind == .exclude }
+}
+
 /// The live, mutable state of one player's board.
 ///
 /// Solo modes give the player a small number of hearts: a wrong cat flashes red,
@@ -23,8 +37,7 @@ final class GameSession: ObservableObject {
     @Published private(set) var isWon = false
     @Published private(set) var isLost = false
     @Published private(set) var faultCell: Cell? = nil
-    @Published private(set) var hintCell: Cell? = nil
-    @Published private(set) var hintReason: String? = nil
+    @Published private(set) var activeHint: Hint? = nil
     @Published private(set) var hintsUsed = 0
     /// Bumps whenever a cat is *correctly* placed, so views can trigger a pop.
     @Published private(set) var lastPlaced: Cell? = nil
@@ -140,19 +153,18 @@ final class GameSession: ObservableObject {
         Haptics.light()
     }
 
-    /// Reveal a forced cat *and explain why it's forced* — teaching the
-    /// deduction rather than just giving the answer. Caps the star rating.
+    /// Build a guided hint that spotlights the reasoning and offers a one-tap
+    /// action — teaching the deduction rather than just giving the answer.
     @discardableResult
-    func hint() -> Cell? {
+    func hint() -> Hint? {
         guard !isOver else { return nil }
 
         // A cell can still hold a cat only if no placed cat shares its row,
-        // column, region, or touches it. (Ignores the player's X notes — this is
-        // the true rule-based deduction.)
+        // column, region, or touches it. (Ignores the player's X notes.)
         func canHoldCat(_ r: Int, _ c: Int) -> Bool {
             if marks[r][c] == .cat { return false }
-            for i in 0..<size where marks[r][i] == .cat { return false }        // row
-            for i in 0..<size where marks[i][c] == .cat { return false }        // column
+            for i in 0..<size where marks[r][i] == .cat { return false }
+            for i in 0..<size where marks[i][c] == .cat { return false }
             let region = board.regionID(row: r, col: c)
             for rr in 0..<size {
                 for cc in 0..<size where marks[rr][cc] == .cat && board.regionID(row: rr, col: cc) == region { return false }
@@ -163,46 +175,97 @@ final class GameSession: ObservableObject {
             } }
             return true
         }
-
-        var available = [[Bool]](repeating: [Bool](repeating: false, count: size), count: size)
-        for r in 0..<size { for c in 0..<size { available[r][c] = canHoldCat(r, c) } }
-
-        // 1) A color region with exactly one square a cat can still go.
-        for region in 0..<size {
-            var cells: [Cell] = []
-            var hasCat = false
-            for r in 0..<size { for c in 0..<size where board.regionID(row: r, col: c) == region {
-                if marks[r][c] == .cat { hasCat = true }
-                if available[r][c] { cells.append(Cell(row: r, col: c)) }
+        // 1) Exclusion around a placed cat (the reference hint): X the empty
+        //    squares still open in its row, column or neighbours.
+        var bestCat: Cell? = nil; var bestTargets: [Cell] = []
+        for r in 0..<size { for c in 0..<size where marks[r][c] == .cat {
+            var targets: [Cell] = []
+            for i in 0..<size {
+                if marks[r][i] == .empty { targets.append(Cell(row: r, col: i)) }
+                if marks[i][c] == .empty { targets.append(Cell(row: i, col: c)) }
+            }
+            for dr in -1...1 { for dc in -1...1 {
+                let nr = r + dr, nc = c + dc
+                if nr >= 0, nr < size, nc >= 0, nc < size, marks[nr][nc] == .empty { targets.append(Cell(row: nr, col: nc)) }
             } }
-            if !hasCat, cells.count == 1 {
-                return reveal(cells[0], "This color has only one square left where a cat can safely go.")
+            var seen = Set<Int>(); targets = targets.filter { seen.insert($0.row * size + $0.col).inserted }
+            if targets.count > bestTargets.count { bestTargets = targets; bestCat = Cell(row: r, col: c) }
+        } }
+        if let cat = bestCat, !bestTargets.isEmpty {
+            return set(.init(kind: .exclude, spotlight: cat, targets: bestTargets,
+                             reason: "This cat's row, column and neighbours can't hold another cat — rule them out."))
+        }
+
+        // 2) Region narrowing: a color with empty squares no cat can reach.
+        //    X them so the one remaining square stands out on its own.
+        for region in 0..<size where !regionHasCat(region) {
+            var blockable: [Cell] = []
+            for r in 0..<size { for c in 0..<size
+                where board.regionID(row: r, col: c) == region && marks[r][c] == .empty && !canHoldCat(r, c) {
+                blockable.append(Cell(row: r, col: c))
+            } }
+            if !blockable.isEmpty {
+                return set(.init(kind: .exclude, spotlight: nil, targets: blockable,
+                                 reason: "No cat can reach these squares in this color — rule them out to narrow it down."))
             }
         }
-        // 2) A row with exactly one available square.
-        for r in 0..<size where !(0..<size).contains(where: { marks[r][$0] == .cat }) {
-            let cells = (0..<size).filter { available[r][$0] }.map { Cell(row: r, col: $0) }
-            if cells.count == 1 { return reveal(cells[0], "This row has only one square left for its cat.") }
+
+        // 3) Focus: a color that's down to one open square — highlight it so the
+        //    player spots the forced cat themselves (never placed for them).
+        for region in 0..<size where !regionHasCat(region) {
+            let cells = regionCells(region)
+            let open = cells.filter { marks[$0.row][$0.col] == .empty }
+            if open.count == 1 {
+                return set(.init(kind: .focus, spotlight: nil, targets: cells,
+                                 reason: "This color is down to one open square — can you see where its cat goes?"))
+            }
         }
-        // 3) A column with exactly one available square.
-        for c in 0..<size where !(0..<size).contains(where: { marks[$0][c] == .cat }) {
-            let cells = (0..<size).filter { available[$0][c] }.map { Cell(row: $0, col: c) }
-            if cells.count == 1 { return reveal(cells[0], "This column has only one square left for its cat.") }
+        // 4) Focus fallback: the most-constrained color.
+        var smallest: (region: Int, open: Int, cells: [Cell])? = nil
+        for region in 0..<size where !regionHasCat(region) {
+            let cells = regionCells(region)
+            let open = cells.filter { marks[$0.row][$0.col] == .empty }.count
+            if open > 0, smallest == nil || open < smallest!.open { smallest = (region, open, cells) }
         }
-        // 4) Fallback: reveal a safe cat and nudge toward marking X's.
-        for r in 0..<size where marks[r][board.solution[r]] != .cat {
-            return reveal(Cell(row: r, col: board.solution[r]),
-                          "A cat is safe here. Mark X's on cells cats can't reach to reveal more forced moves.")
+        if let s = smallest {
+            return set(.init(kind: .focus, spotlight: nil, targets: s.cells,
+                             reason: "Fewest squares means fewest choices — reason about this color next."))
         }
         return nil
     }
 
-    private func reveal(_ cell: Cell, _ reason: String) -> Cell {
-        hintsUsed += 1
-        hintCell = cell
-        hintReason = reason
-        return cell   // stays until the next board interaction
+    private func regionHasCat(_ region: Int) -> Bool {
+        for r in 0..<size { for c in 0..<size
+            where board.regionID(row: r, col: c) == region && marks[r][c] == .cat { return true } }
+        return false
     }
+    private func regionCells(_ region: Int) -> [Cell] {
+        var cells: [Cell] = []
+        for r in 0..<size { for c in 0..<size where board.regionID(row: r, col: c) == region { cells.append(Cell(row: r, col: c)) } }
+        return cells
+    }
+
+    private func set(_ hint: Hint) -> Hint {
+        hintsUsed += 1
+        activeHint = hint
+        return hint
+    }
+
+    /// Apply the active hint's X's (exclude only), then dismiss it.
+    func applyHint() {
+        guard let h = activeHint, h.kind == .exclude else { activeHint = nil; return }
+        activeHint = nil
+        var group: [Move] = []
+        for t in h.targets where marks[t.row][t.col] == .empty {
+            group.append(move(t.row, t.col))
+            marks[t.row][t.col] = .blocked
+        }
+        commit(group)
+        Haptics.light()
+        SoundPlayer.shared.play(.tick)
+    }
+
+    func dismissHint() { activeHint = nil }
 
     /// Force a loss (opponent solved first / forfeit / time up).
     func forceLose() {
@@ -273,5 +336,5 @@ final class GameSession: ObservableObject {
         }
     }
 
-    private func clearHint() { hintCell = nil; hintReason = nil }
+    private func clearHint() { activeHint = nil }
 }

@@ -88,7 +88,10 @@ struct BoardView: View {
         let mark = session.mark(row: r, col: c)
         let id = GameSession.Cell(row: r, col: c)
         let isFault = session.faultCell == id
-        let isHint = session.hintCell == id || spotlight == id
+        let hint = session.activeHint
+        let isSpot = hint?.spotlight == id || spotlight == id
+        let isTarget = hint?.targets.contains(id) ?? false
+        let dimmed = hint != nil && !isSpot && !isTarget
         let region = board.regionID(row: r, col: c)
         let inset = cell * 0.045
         let radius = cell * 0.20
@@ -109,13 +112,6 @@ struct BoardView: View {
                 .padding(inset)
                 .shadow(color: .black.opacity(0.12), radius: 1, y: 1)
 
-            if isHint {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(Color.white, lineWidth: 3)
-                    .padding(inset)
-                    .modifier(PulseEffect())
-            }
-
             switch mark {
             case .cat:
                 CatFace(style: style)
@@ -127,6 +123,25 @@ struct BoardView: View {
                     .transition(.opacity)
             case .empty:
                 EmptyView()
+            }
+
+            // Dim everything except the spotlight and the cells being acted on.
+            if dimmed {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(.black.opacity(0.55))
+                    .padding(inset)
+            }
+            // Preview the X's that "Apply" will place (exclude hints only).
+            if isTarget, hint?.kind == .exclude {
+                XMark().frame(width: cell * 0.46, height: cell * 0.46)
+                    .modifier(PulseEffect())
+            }
+            // Spotlight ring on the cat being reasoned about, or a focused cell.
+            if isSpot {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.white, lineWidth: 3)
+                    .padding(inset)
+                    .modifier(PulseEffect())
             }
         }
         .animation(.snappy(duration: 0.18), value: mark)

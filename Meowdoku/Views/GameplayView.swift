@@ -58,11 +58,12 @@ private struct GameBoardScreen: View {
                           onDoubleTap: { r, c in session.placeCat(row: r, col: c) },
                           onPaint: { r, c in session.paintBlock(row: r, col: c) })
                     .padding(.horizontal, 8)
-                hintBanner
+                    .allowsHitTesting(session.activeHint == nil)
                 controls
             }
             .padding()
 
+            if let hint = session.activeHint { hintPopover(hint) }
             if session.isOver { resultOverlay }
         }
         .onChange(of: session.isWon) { _, won in if won { recordWin() } }
@@ -112,41 +113,59 @@ private struct GameBoardScreen: View {
         }
     }
 
-    @ViewBuilder private var hintBanner: some View {
-        if let reason = session.hintReason {
-            HStack(spacing: 8) {
-                Image(systemName: "lightbulb.fill").foregroundStyle(.yellow)
-                Text(reason).font(.footnote).foregroundStyle(.white)
+    private func hintPopover(_ hint: Hint) -> some View {
+        VStack {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "lightbulb.fill").foregroundStyle(.orange).font(.title3)
+                Text(hint.reason)
+                    .font(.callout.weight(.medium)).foregroundStyle(.black)
                     .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.yellow.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
-            .transition(.opacity)
+            .padding(16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+            .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+            .padding(.horizontal, 18)
+            .padding(.top, 96)
+            Spacer()
         }
+        .transition(.opacity.combined(with: .move(edge: .top)))
     }
 
-    private var controls: some View {
-        HStack(spacing: 12) {
-            Button {
-                session.undo()
-            } label: {
-                Label("Undo", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered).tint(.white)
-            .disabled(!session.canUndo)
-
-            if mode.hintsAllowed {
-                Button {
-                    session.hint()
-                } label: {
-                    Label("Hint", systemImage: "lightbulb.fill").frame(maxWidth: .infinity)
+    @ViewBuilder private var controls: some View {
+        if let hint = session.activeHint {
+            HStack(spacing: 12) {
+                Button { session.dismissHint() } label: {
+                    Text("Dismiss").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered).tint(.yellow)
-                .disabled(session.isOver)
+                .buttonStyle(.bordered).tint(.white)
+
+                Button {
+                    hint.canApply ? session.applyHint() : session.dismissHint()
+                } label: {
+                    Text(hint.canApply ? "Apply" : "Got it").bold().frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent).tint(.orange)
             }
+            .frame(maxWidth: 340)
+        } else {
+            HStack(spacing: 12) {
+                Button { session.undo() } label: {
+                    Label("Undo", systemImage: "arrow.uturn.backward").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered).tint(.white)
+                .disabled(!session.canUndo)
+
+                if mode.hintsAllowed {
+                    Button { session.hint() } label: {
+                        Label("Hint", systemImage: "lightbulb.fill").frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered).tint(.yellow)
+                    .disabled(session.isOver)
+                }
+            }
+            .frame(maxWidth: 340)
         }
-        .frame(maxWidth: 320)
     }
 
     // MARK: Result
