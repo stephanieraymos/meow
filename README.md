@@ -82,3 +82,35 @@ xcodebuild -exportArchive \
 distribution profile automatically (needs an App Store Connect API key in Xcode's
 accounts, or an interactive Xcode login). Then upload `build/export/Meowdoku.ipa`
 to TestFlight with Transporter or `xcrun altool --upload-app`.
+
+## Game Center setup (App Store Connect)
+
+The app already submits scores/achievements using the IDs below; create them in
+App Store Connect → your app → Features → Game Center to activate them.
+
+Leaderboards (Single leaderboard · **Score format: Elapsed Time to the
+hundredth of a second** · **Sort: Low to High**, faster is better):
+
+| Leaderboard ID | Purpose |
+|----------------|---------|
+| `meow.time.6`  | Fastest 6×6 solve |
+| `meow.time.8`  | Fastest 8×8 solve |
+| `meow.time.10` | Fastest 10×10 solve |
+| `meow.daily.time` | Fastest daily-puzzle solve |
+
+Achievements:
+
+| Achievement ID | When it fires |
+|----------------|---------------|
+| `meow.win.first` | First solo win |
+| `meow.streak.7`  | 7-day daily streak |
+| `meow.level.50`  | Complete level 50 |
+| `meow.flawless`  | Solve with no mistakes and no hints |
+
+The Game Center capability is already enabled in `Meowdoku.entitlements`.
+
+## Notifications
+
+The daily reminder uses **local** notifications only — no APNs certificate, push
+key, or App Store Connect configuration required. iOS shows the permission prompt
+when the player enables "Daily reminder" in Settings.
