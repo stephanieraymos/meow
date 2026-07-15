@@ -136,6 +136,12 @@ struct SettingsView: View {
                         }
                         .padding(.top, 4)
                     }
+
+                    section("Credits") {
+                        Text(MeowCredits.assets)
+                            .font(.caption).foregroundStyle(MeowTheme.ink.opacity(0.7))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .padding()
             }

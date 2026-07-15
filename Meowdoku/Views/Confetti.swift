@@ -81,14 +81,13 @@ struct SlumpEffect: ViewModifier {
 struct CommiserationCat: View {
     var style: CatStyle = CatStyles.all[0]
     var body: some View {
-        Group {
-            if UIImage(named: "sad_cat") != nil {
-                Image("sad_cat").resizable().scaledToFit()
-            } else {
-                CatFace(style: style)
-            }
+        if Bundle.main.url(forResource: "sad_cat", withExtension: "usdz") != nil {
+            CatSceneView(resource: "sad_cat")   // animated 3D cat, hangs its head
+        } else if UIImage(named: "sad_cat") != nil {
+            Image("sad_cat").resizable().scaledToFit().modifier(SlumpEffect())
+        } else {
+            CatFace(style: style).modifier(SlumpEffect())
         }
-        .modifier(SlumpEffect())
     }
 }
 

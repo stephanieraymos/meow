@@ -12,3 +12,6 @@ xcuserdata/
 # Swift Package Manager
 .swiftpm/
 .build/
+
+# Raw 3D source downloads (only the bundled .usdz in Meowdoku/Models is committed)
+art/
