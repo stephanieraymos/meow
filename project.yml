@@ -24,6 +24,9 @@ targets:
       properties:
         CFBundleDisplayName: Meowdoku
         CFBundleShortVersionString: "1.0"
+        # Only standard HTTPS (Apple's OS crypto) — export-compliance exempt.
+        # Declaring it here stops App Store Connect asking on every build.
+        ITSAppUsesNonExemptEncryption: false
         # Reference the build setting so `make ship` (which passes a timestamp as
         # CURRENT_PROJECT_VERSION) produces a unique, ever-increasing build number.
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"

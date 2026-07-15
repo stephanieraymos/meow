@@ -31,6 +31,8 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>SUPABASE_ANON_KEY</key>
 	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlodmxqZ3dmc2x4b3J4c29yenBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5MDc4OTksImV4cCI6MjA5MzQ4Mzg5OX0.GHwh57fi7fQqbo08jkaVSV66bhtSpc0ztKpyBDe2Z0s</string>
 	<key>SUPABASE_URL</key>
