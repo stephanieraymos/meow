@@ -42,9 +42,11 @@ private struct GameBoardScreen: View {
         self.onNext = onNext
         self.onExit = onExit
         let board = PuzzleGenerator.generate(seed: mode.seed, size: mode.size)
+        let palette = PlayerProfile.shared.palette
         _session = StateObject(wrappedValue: GameSession(board: board,
                                                          allowedMistakes: mode.allowedMistakes,
-                                                         autoMark: PlayerProfile.shared.autoMarkOn))
+                                                         autoMark: PlayerProfile.shared.autoMarkOn,
+                                                         colorNames: palette.regionNames(count: board.size)))
     }
 
     var body: some View {
@@ -115,6 +117,14 @@ private struct GameBoardScreen: View {
         }
     }
 
+    private func applyLabel(for hint: Hint) -> String {
+        switch hint.kind {
+        case .place:   return "Place cat"
+        case .exclude: return "Apply X's"
+        case .focus:   return "Got it"
+        }
+    }
+
     private func hintPopover(_ hint: Hint) -> some View {
         VStack {
             HStack(alignment: .top, spacing: 10) {
@@ -145,7 +155,7 @@ private struct GameBoardScreen: View {
                 Button {
                     hint.canApply ? session.applyHint() : session.dismissHint()
                 } label: {
-                    Text(hint.canApply ? "Apply" : "Got it").bold().frame(maxWidth: .infinity)
+                    Text(applyLabel(for: hint)).bold().frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent).tint(.orange)
             }

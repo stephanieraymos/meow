@@ -11,6 +11,66 @@ struct MeowPalette: Identifiable, Equatable {
     func color(_ regionID: Int) -> Color {
         colors[((regionID % colors.count) + colors.count) % colors.count]
     }
+
+    /// A plain-English name for a region's color, used in hint text. Classified
+    /// from hue/brightness so it works for any palette.
+    func name(_ regionID: Int) -> String { MeowPalette.name(for: color(regionID)) }
+
+    /// Unique color names for regions 0..<count. Where a clustered palette maps
+    /// two regions to the same base name, they're qualified by brightness
+    /// ("deep orange" / "light orange") so every region reads distinctly in hints.
+    func regionNames(count: Int) -> [String] {
+        let base = (0..<count).map { name($0) }
+        let bright = (0..<count).map { MeowPalette.brightness(of: color($0)) }
+        var byName: [String: [Int]] = [:]
+        for i in 0..<count { byName[base[i], default: []].append(i) }
+        var out = base
+        for (nm, idxs) in byName where idxs.count > 1 {
+            let sorted = idxs.sorted { bright[$0] < bright[$1] }   // darkest first
+            for (rank, region) in sorted.enumerated() {
+                switch (sorted.count, rank) {
+                case (2, 0): out[region] = "deep \(nm)"
+                case (2, 1): out[region] = "light \(nm)"
+                case (3, 0): out[region] = "deep \(nm)"
+                case (3, 1): out[region] = nm
+                case (3, 2): out[region] = "light \(nm)"
+                default:     out[region] = "\(nm) \(rank + 1)"
+                }
+            }
+        }
+        return out
+    }
+
+    static func brightness(of color: Color) -> CGFloat {
+        var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getHue(&h, saturation: &s, brightness: &v, alpha: &a)
+        return v
+    }
+
+    static func name(for color: Color) -> String {
+        var h: CGFloat = 0, s: CGFloat = 0, v: CGFloat = 0, a: CGFloat = 0
+        UIColor(color).getHue(&h, saturation: &s, brightness: &v, alpha: &a)
+        let hue = h * 360
+        // Near-greys, then muted mid-tones that would otherwise collide with a
+        // vivid sibling of the same hue (slate ≠ blue, brown ≠ orange).
+        if s < 0.16 { return v > 0.72 ? "white" : (v < 0.35 ? "charcoal" : "grey") }
+        if s < 0.34, hue >= 190, hue < 260 { return "slate" }
+        if (hue < 45 || hue >= 340), s < 0.62, v < 0.85 { return "brown" }
+        switch hue {
+        case ..<15, 345...: return "red"
+        case ..<40:  return "orange"
+        case ..<65:  return v < 0.62 ? "olive" : "yellow"
+        case ..<95:  return "lime"
+        case ..<150: return "green"
+        case ..<175: return "teal"
+        case ..<200: return "cyan"
+        case ..<245: return "blue"
+        case ..<275: return "indigo"
+        case ..<310: return "purple"
+        case ..<335: return "magenta"
+        default:     return "pink"
+        }
+    }
 }
 
 private func rgb(_ r: Double, _ g: Double, _ b: Double) -> Color { Color(red: r, green: g, blue: b) }

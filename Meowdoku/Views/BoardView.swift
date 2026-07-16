@@ -148,6 +148,23 @@ struct BoardView: View {
                 XMark().frame(width: cell * 0.46, height: cell * 0.46)
                     .modifier(PulseEffect())
             }
+            // Preview a forced cat: a ghost cat with a "?" the player can place.
+            if isTarget, hint?.kind == .place {
+                ZStack {
+                    CatFace(style: style)
+                        .frame(width: cell * 0.78, height: cell * 0.78)
+                        .opacity(0.9)
+                    Circle().fill(.black.opacity(0.55))
+                        .frame(width: cell * 0.34, height: cell * 0.34)
+                        .overlay(Text("?").font(.system(size: cell * 0.24, weight: .heavy)).foregroundStyle(.white))
+                        .offset(x: cell * 0.24, y: -cell * 0.24)
+                }
+                .modifier(PulseEffect())
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .stroke(Color.white, lineWidth: 3)
+                    .padding(inset)
+                    .modifier(PulseEffect())
+            }
             // Spotlight ring on the cat being reasoned about, or a focused cell.
             if isSpot {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
