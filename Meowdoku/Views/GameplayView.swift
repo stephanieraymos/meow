@@ -119,9 +119,8 @@ private struct GameBoardScreen: View {
 
     private func applyLabel(for hint: Hint) -> String {
         switch hint.kind {
-        case .place:   return "Place cat"
-        case .exclude: return "Apply X's"
-        case .focus:   return "Got it"
+        case .exclude, .testExclude: return "Apply"
+        case .focus:                 return "Got it"
         }
     }
 

@@ -7,21 +7,24 @@ enum CellMark: Equatable {
     case blocked  // an "X" note: player has ruled this cell out
 }
 
-/// A guided hint. Two kinds carry an action:
-///  - `.exclude` rules out (X's) `targets` and explains why.
-///  - `.place` reveals a *forced* cat — a square that's the only one left for a
-///     row, column or color — and explains the deduction that pins it there.
-/// `.focus` just spotlights a nearly-solved color without acting. Every hint's
-/// `reason` states the concrete consequence, so it teaches the next best move.
+/// A guided hint. Hints never place a cat — they only ever lead the player to an
+/// "X", and explain the deduction so the move teaches something:
+///  - `.exclude` rules out (X's) a *group* of `targets` and explains why.
+///  - `.testExclude` rules out a *single* candidate `targets[0]` by contradiction:
+///     a cat there would wipe out every open square of some row/column/color, so
+///     that line could never get its cat — meaning a cat can't go there. Shown as
+///     a "?"-cat on the tested square with the doomed line highlighted.
+///  - `.focus` just spotlights a nearly-solved color without acting.
+/// Every hint's `reason` states the concrete consequence.
 struct Hint: Equatable {
     enum Kind {
-        case exclude   // X out `targets`; "Apply" marks them
-        case place     // a cat is forced at `targets[0]`; "Apply" places it
-        case focus     // just highlight `targets` (a color/row that's nearly solved)
+        case exclude      // X out the group `targets`; "Apply" marks them
+        case testExclude  // "?"-cat: a cat at `targets[0]` is impossible; "Apply" X's it
+        case focus        // just highlight `targets` (a color/row that's nearly solved)
     }
     let kind: Kind
-    let highlight: [GameSession.Cell]  // the "cause" cells the reasoning points at
-    let targets: [GameSession.Cell]    // exclude: empties to X · place: the forced cat · focus: cells to highlight
+    let highlight: [GameSession.Cell]  // the "cause" cells the reasoning points at (the doomed line for testExclude)
+    let targets: [GameSession.Cell]    // exclude: empties to X · testExclude: the one impossible cell · focus: cells to highlight
     let reason: String
     var canApply: Bool { kind != .focus }
 }
@@ -182,10 +185,10 @@ final class GameSession: ObservableObject {
         var possible = [[Bool]](repeating: [Bool](repeating: false, count: size), count: size)
         for r in 0..<size { for c in 0..<size { possible[r][c] = marks[r][c] == .empty && canHoldCat(r, c) } }
 
-        // A forced cat is the most useful "next move", so offer it first; then the
-        // exclusions that create more of them, simplest (most teachable) first.
-        return hiddenSingle(possible)
-            ?? basicElimination()
+        // Simplest (most teachable) exclusions first, then the contradiction test,
+        // then the more abstract locked/naked deductions.
+        return basicElimination()
+            ?? contradictionExclusion(possible)
             ?? lockedInLine(possible)
             ?? nakedSubset(possible, byColumn: true)
             ?? nakedSubset(possible, byColumn: false)
@@ -212,36 +215,46 @@ final class GameSession: ObservableObject {
         }
     }
 
-    /// Technique 0 — a forced cat (hidden single). If a color, row or column has
-    /// exactly one square a cat can still occupy, that's where its cat must go.
-    /// This is a *placement* hint: it teaches by showing which constraint pins the
-    /// square, then places the cat on Apply.
-    private func hiddenSingle(_ possible: [[Bool]]) -> Hint? {
-        // Color with one square left — most instructive, so check first.
-        for region in 0..<size where regionCat(region) == nil {
-            let cells = regionCells(region).filter { possible[$0.row][$0.col] }
-            if cells.count == 1 {
-                return set(.init(kind: .place, highlight: regionCells(region), targets: cells,
-                                 reason: "\(catPhrase(region).capitalizedFirst) has only one square left — it must go here."))
+    /// Technique — contradiction ("what-if"). If putting a cat in a candidate
+    /// square would rule out *every* remaining open square of some row, column or
+    /// color, then that line could never get its own cat. Since every line needs
+    /// one, a cat can't go in that candidate — so it must be an "X". This is the
+    /// "?"-cat hint: the tested square with the doomed line highlighted.
+    private func contradictionExclusion(_ possible: [[Bool]]) -> Hint? {
+        for r in 0..<size { for c in 0..<size where possible[r][c] {
+            let hereRegion = board.regionID(row: r, col: c)
+
+            for tr in 0..<size where tr != r && rowCat(tr) == nil {
+                let cands = (0..<size).filter { possible[tr][$0] }.map { Cell(row: tr, col: $0) }
+                if !cands.isEmpty, cands.allSatisfy({ wouldEliminate(catAt: (r, c), cell: $0) }) {
+                    return set(.init(kind: .testExclude, highlight: cands, targets: [Cell(row: r, col: c)],
+                        reason: "A cat here would rule out every open square in row \(tr + 1) — but every row needs a cat, so this square must be X."))
+                }
             }
-        }
-        // Row with one square left.
-        for r in 0..<size where rowCat(r) == nil {
-            let cells = (0..<size).filter { possible[r][$0] }.map { Cell(row: r, col: $0) }
-            if cells.count == 1 {
-                return set(.init(kind: .place, highlight: (0..<size).map { Cell(row: r, col: $0) }, targets: cells,
-                                 reason: "Row \(r + 1) has only one open square left — a cat must go here."))
+            for tc in 0..<size where tc != c && colCat(tc) == nil {
+                let cands = (0..<size).filter { possible[$0][tc] }.map { Cell(row: $0, col: tc) }
+                if !cands.isEmpty, cands.allSatisfy({ wouldEliminate(catAt: (r, c), cell: $0) }) {
+                    return set(.init(kind: .testExclude, highlight: cands, targets: [Cell(row: r, col: c)],
+                        reason: "A cat here would rule out every open square in column \(tc + 1) — but every column needs a cat, so this square must be X."))
+                }
             }
-        }
-        // Column with one square left.
-        for c in 0..<size where colCat(c) == nil {
-            let cells = (0..<size).filter { possible[$0][c] }.map { Cell(row: $0, col: c) }
-            if cells.count == 1 {
-                return set(.init(kind: .place, highlight: (0..<size).map { Cell(row: $0, col: c) }, targets: cells,
-                                 reason: "Column \(c + 1) has only one open square left — a cat must go here."))
+            for reg in 0..<size where reg != hereRegion && regionCat(reg) == nil {
+                let cands = regionCells(reg).filter { possible[$0.row][$0.col] }
+                if !cands.isEmpty, cands.allSatisfy({ wouldEliminate(catAt: (r, c), cell: $0) }) {
+                    return set(.init(kind: .testExclude, highlight: cands, targets: [Cell(row: r, col: c)],
+                        reason: "A cat here would rule out every open square of \(colorName(reg)) — but each color needs a cat, so this square must be X."))
+                }
             }
-        }
+        } }
         return nil
+    }
+
+    /// Would a cat at `catAt` rule `cell` out? True if they share a row, column or
+    /// color, or touch (orthogonally or diagonally).
+    private func wouldEliminate(catAt: (r: Int, c: Int), cell: Cell) -> Bool {
+        if cell.row == catAt.r || cell.col == catAt.c { return true }
+        if board.regionID(row: cell.row, col: cell.col) == board.regionID(row: catAt.r, col: catAt.c) { return true }
+        return abs(cell.row - catAt.r) <= 1 && abs(cell.col - catAt.c) <= 1
     }
 
     /// A square can still hold a cat only if no placed cat shares its row, column
@@ -398,17 +411,14 @@ final class GameSession: ObservableObject {
         return hint
     }
 
-    /// Apply the active hint's action, then dismiss it: `.exclude` X's its
-    /// targets; `.place` drops the forced cat (always a solution cell, so it's
-    /// safe); `.focus` just dismisses.
+    /// Apply the active hint's action, then dismiss it. Both `.exclude` and
+    /// `.testExclude` only ever place "X"s — never a cat — so the player still
+    /// makes every placement themselves. `.focus` just dismisses.
     func applyHint() {
         guard let h = activeHint else { return }
+        activeHint = nil
         switch h.kind {
-        case .place:
-            activeHint = nil
-            if let t = h.targets.first { placeCat(row: t.row, col: t.col) }
-        case .exclude:
-            activeHint = nil
+        case .exclude, .testExclude:
             var group: [Move] = []
             for t in h.targets where marks[t.row][t.col] == .empty {
                 group.append(move(t.row, t.col))
@@ -418,7 +428,7 @@ final class GameSession: ObservableObject {
             Haptics.light()
             SoundPlayer.shared.play(.tick)
         case .focus:
-            activeHint = nil
+            break
         }
     }
 

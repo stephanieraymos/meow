@@ -101,9 +101,13 @@ struct BoardView: View {
         let id = GameSession.Cell(row: r, col: c)
         let isFault = session.faultCell == id
         let hint = session.activeHint
-        let isSpot = spotlight == id || (hint?.highlight.contains(id) ?? false)
+        let isHighlight = hint?.highlight.contains(id) ?? false
         let isTarget = hint?.targets.contains(id) ?? false
-        let dimmed = hint != nil && !isSpot && !isTarget
+        // For a "?"-cat (testExclude) hint the highlighted line is shown yellow,
+        // not with a plain ring; other hints ring their highlight cells.
+        let isDoomed = isHighlight && hint?.kind == .testExclude
+        let isRinged = spotlight == id || (isHighlight && hint?.kind != .testExclude)
+        let dimmed = hint != nil && !isHighlight && !isTarget && spotlight != id
         let region = board.regionID(row: r, col: c)
         let inset = cell * 0.045
         let radius = cell * 0.20
@@ -143,30 +147,37 @@ struct BoardView: View {
                     .fill(.black.opacity(0.55))
                     .padding(inset)
             }
-            // Preview the X's that "Apply" will place (exclude hints only).
+            // Preview the X's that "Apply" will place (group exclude hints).
             if isTarget, hint?.kind == .exclude {
                 XMark().frame(width: cell * 0.46, height: cell * 0.46)
                     .modifier(PulseEffect())
             }
-            // Preview a forced cat: a ghost cat with a "?" the player can place.
-            if isTarget, hint?.kind == .place {
+            // "?"-cat: the square being tested. A cat here is impossible, so Apply
+            // X's it — the "?" says "what if a cat went here?".
+            if isTarget, hint?.kind == .testExclude {
                 ZStack {
                     CatFace(style: style)
-                        .frame(width: cell * 0.78, height: cell * 0.78)
+                        .frame(width: cell * 0.74, height: cell * 0.74)
                         .opacity(0.9)
-                    Circle().fill(.black.opacity(0.55))
-                        .frame(width: cell * 0.34, height: cell * 0.34)
-                        .overlay(Text("?").font(.system(size: cell * 0.24, weight: .heavy)).foregroundStyle(.white))
-                        .offset(x: cell * 0.24, y: -cell * 0.24)
+                    Text("?").font(.system(size: cell * 0.34, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.6), radius: 1)
                 }
                 .modifier(PulseEffect())
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(Color.white, lineWidth: 3)
                     .padding(inset)
+            }
+            // The doomed line a "?"-cat would wipe out — tinted yellow to show the
+            // squares that would all be lost.
+            if isDoomed {
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .fill(Color(red: 1.0, green: 0.86, blue: 0.35).opacity(0.55))
+                    .padding(inset)
                     .modifier(PulseEffect())
             }
-            // Spotlight ring on the cat being reasoned about, or a focused cell.
-            if isSpot {
+            // Spotlight ring on a focused cell / the cells a hint reasons about.
+            if isRinged {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
                     .stroke(Color.white, lineWidth: 3)
                     .padding(inset)
