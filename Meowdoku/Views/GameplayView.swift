@@ -51,23 +51,23 @@ private struct GameBoardScreen: View {
                                                          colorNames: palette.regionNames(count: board.size)))
     }
 
+    /// Warm brown used for headers/labels — matches the original's cozy ink.
+    private let brand = Color(red: 0.44, green: 0.31, blue: 0.27)
+
     var body: some View {
         ZStack {
             MeowTheme.backdrop.ignoresSafeArea()
-            VStack(spacing: 14) {
+            VStack(spacing: 12) {
                 topBar
-                header
-                BoardView(session: session,
-                          style: profile.catStyle,
-                          palette: profile.palette,
-                          onSingleTap: { r, c in session.toggleBlock(row: r, col: c) },
-                          onDoubleTap: { r, c in session.placeCat(row: r, col: c) },
-                          onPaint: { r, c in session.paintBlock(row: r, col: c) })
-                    .padding(.horizontal, 8)
+                statusRow
+                ruleCards
+                boardCard
                     .allowsHitTesting(session.activeHint == nil)
                 controls
+                Spacer(minLength: 0)
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 4)
 
             if let hint = session.activeHint { hintPopover(hint) }
             if session.isOver { resultOverlay }
@@ -76,47 +76,129 @@ private struct GameBoardScreen: View {
         .onChange(of: session.isLost) { _, lost in if lost { recordLoss() } }
     }
 
-    // MARK: Bars
+    // MARK: Chrome
 
-    private var topBar: some View {
-        HStack {
-            Button { onExit() } label: { Image(systemName: "chevron.left").font(.headline) }
-            Spacer()
-            Text(mode.title).font(.headline).foregroundStyle(MeowTheme.ink)
-            Spacer()
-            Button { onExit() } label: { Image(systemName: "xmark").font(.headline) }
+    private func roundButton(_ system: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: system).font(.headline.weight(.semibold))
+                .foregroundStyle(brand)
+                .frame(width: 42, height: 42)
+                .background(MeowTheme.card, in: Circle())
+                .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
         }
-        .foregroundStyle(MeowTheme.ink)
     }
 
-    private var header: some View {
-        VStack(spacing: 8) {
-            HStack {
-                hearts
-                Spacer()
-                Label("\(session.progress)/\(session.size)", systemImage: "pawprint.fill")
-                    .font(.subheadline.monospacedDigit()).foregroundStyle(MeowTheme.ink)
-                if mode.showsTimer {
-                    Spacer()
+    /// Level / Score header, flanked by round back + close buttons (the original's
+    /// top bar). Non-campaign modes show their title in place of the stats.
+    private var topBar: some View {
+        HStack(alignment: .center) {
+            roundButton("chevron.left") { onExit() }
+            Spacer()
+            if case .level(let i) = mode.kind {
+                HStack(spacing: 36) {
+                    headerStat("Level", "\(i)")
+                    headerStat("Score", "\(runningScore)")
+                }
+            } else {
+                Text(mode.title).font(.title2.weight(.bold)).foregroundStyle(brand)
+            }
+            Spacer()
+            roundButton("xmark") { onExit() }
+        }
+    }
+
+    private func headerStat(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 1) {
+            Text(label).font(.subheadline.weight(.semibold)).foregroundStyle(brand.opacity(0.75))
+            Text(value).font(.title.weight(.heavy)).monospacedDigit().foregroundStyle(brand)
+        }
+    }
+
+    /// A live, display-only score that ticks up as cats land (the final award is
+    /// computed at win). Keeps the header's "Score" alive like the original.
+    private var runningScore: Int {
+        session.isWon ? earnedScore
+                      : max(0, session.progress * 120 - session.mistakes * 40 - session.hintsUsed * 30)
+    }
+
+    /// Cat progress + hearts (+ timer) pills — the original's status row.
+    private var statusRow: some View {
+        HStack(spacing: 10) {
+            pill {
+                HStack(spacing: 6) {
+                    Image(systemName: "cat.fill").font(.subheadline).foregroundStyle(brand)
+                    (Text("\(session.progress)")
+                        .foregroundStyle(session.progress >= session.size ? Color.green : brand)
+                     + Text("/\(session.size)").foregroundStyle(brand.opacity(0.7)))
+                        .font(.subheadline.weight(.bold)).monospacedDigit()
+                }
+            }
+            Spacer()
+            if mode.showsTimer {
+                pill {
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         Label(timeString(session.elapsed), systemImage: "clock")
-                            .font(.subheadline.monospacedDigit()).foregroundStyle(MeowTheme.ink.opacity(0.85))
+                            .font(.subheadline.weight(.semibold)).monospacedDigit()
+                            .foregroundStyle(brand.opacity(0.8))
                     }
                 }
             }
-            Text("Double-tap = cat · tap = X · drag = mark · no hints in races")
-                .font(.caption2).foregroundStyle(MeowTheme.ink.opacity(0.55))
+            pill { hearts }
         }
+    }
+
+    private func pill<C: View>(@ViewBuilder _ content: () -> C) -> some View {
+        content()
+            .padding(.horizontal, 14).padding(.vertical, 8)
+            .background(MeowTheme.card, in: Capsule())
+            .shadow(color: .black.opacity(0.05), radius: 3, y: 1)
     }
 
     private var hearts: some View {
         HStack(spacing: 3) {
             ForEach(0..<mode.allowedMistakes, id: \.self) { i in
                 Image(systemName: i < session.heartsRemaining ? "heart.fill" : "heart")
-                    .foregroundStyle(i < session.heartsRemaining ? .pink : MeowTheme.ink.opacity(0.3))
+                    .foregroundStyle(i < session.heartsRemaining ? .pink : brand.opacity(0.25))
                     .font(.subheadline)
             }
         }
+    }
+
+    /// The always-visible rules strip (the original's three rule cards).
+    private var ruleCards: some View {
+        HStack(spacing: 8) {
+            ruleCard(.color, "1 Cat per color")
+            ruleCard(.line,  "1 Cat per row & column")
+            ruleCard(.touch, "Cats can't touch")
+        }
+        .padding(10)
+        .background(MeowTheme.card.opacity(0.55), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func ruleCard(_ kind: RuleKind, _ text: String) -> some View {
+        HStack(spacing: 7) {
+            MiniRuleGrid(kind: kind)
+            Text(text).font(.caption2.weight(.medium)).foregroundStyle(brand)
+                .fixedSize(horizontal: false, vertical: true)
+                .minimumScaleFactor(0.8)
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8).padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(MeowTheme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    /// The board inside its white rounded card (the original's board container).
+    private var boardCard: some View {
+        BoardView(session: session,
+                  style: profile.catStyle,
+                  palette: profile.palette,
+                  onSingleTap: { r, c in session.toggleBlock(row: r, col: c) },
+                  onDoubleTap: { r, c in session.placeCat(row: r, col: c) },
+                  onPaint: { r, c in session.paintBlock(row: r, col: c) })
+            .padding(8)
+            .background(MeowTheme.card, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
     }
 
     private func applyLabel(for hint: Hint) -> String {
@@ -289,6 +371,51 @@ private struct GameBoardScreen: View {
     private func timeString(_ t: TimeInterval) -> String {
         let s = Int(t)
         return String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+/// Which rule a `MiniRuleGrid` glyph illustrates.
+enum RuleKind { case color, line, touch }
+
+/// A tiny 3×3 glyph for the rule cards: distinct colored cells (per-color), a
+/// tinted cross (per row & column), or an isolated center cell (no touching).
+struct MiniRuleGrid: View {
+    let kind: RuleKind
+    private let side: CGFloat = 8
+
+    var body: some View {
+        VStack(spacing: 1.5) {
+            ForEach(0..<3, id: \.self) { r in
+                HStack(spacing: 1.5) {
+                    ForEach(0..<3, id: \.self) { c in
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(fill(r, c))
+                            .frame(width: side, height: side)
+                            .overlay {
+                                if r == 1 && c == 1 {
+                                    Circle().fill(Color(red: 0.22, green: 0.22, blue: 0.26))
+                                        .frame(width: side * 0.5, height: side * 0.5)
+                                }
+                            }
+                    }
+                }
+            }
+        }
+    }
+
+    private func fill(_ r: Int, _ c: Int) -> Color {
+        let dim = Color.gray.opacity(0.18)
+        switch kind {
+        case .color:
+            let cols = [Color(red: 0.97, green: 0.71, blue: 0.72),
+                        Color(red: 0.66, green: 0.83, blue: 0.95),
+                        Color(red: 0.80, green: 0.86, blue: 0.66)]
+            return cols[r % cols.count].opacity(0.9)
+        case .line:
+            return (r == 1 || c == 1) ? Color(red: 0.80, green: 0.73, blue: 0.96) : dim
+        case .touch:
+            return (r == 1 && c == 1) ? Color(red: 0.66, green: 0.83, blue: 0.95) : dim
+        }
     }
 }
 

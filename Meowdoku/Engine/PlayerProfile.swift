@@ -38,7 +38,7 @@ final class PlayerProfile: ObservableObject {
         var autoMarkOn: Bool = true
         var tutorialSeen: Bool = false
         var remindersOn: Bool = false
-        var appearance: String = "dark"
+        var appearance: String = "light"
         var paletteID: String = "cozy"
 
         init() {}
@@ -66,7 +66,7 @@ final class PlayerProfile: ObservableObject {
             autoMarkOn = v(.autoMarkOn, true)
             tutorialSeen = v(.tutorialSeen, false)
             remindersOn = v(.remindersOn, false)
-            appearance = v(.appearance, "dark")
+            appearance = v(.appearance, "light")
             paletteID = v(.paletteID, "cozy")
         }
     }

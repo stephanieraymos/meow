@@ -41,20 +41,28 @@ enum MeowTheme {
             : UIColor(red: 0.32, green: 0.22, blue: 0.42, alpha: 0.09)
     })
 
-    /// A warm, playful gradient behind menus and result screens — plum in dark
-    /// mode, soft lavender in light mode.
+    /// Backdrop behind menus and the board — plum in dark mode, warm cream in
+    /// light mode (matching the original Meowdoku's cozy off-white).
     static var backdrop: LinearGradient {
         LinearGradient(
             colors: [
                 Color(uiColor: UIColor { t in t.userInterfaceStyle == .dark
                     ? UIColor(red: 0.16, green: 0.13, blue: 0.24, alpha: 1)
-                    : UIColor(red: 0.97, green: 0.95, blue: 0.99, alpha: 1) }),
+                    : UIColor(red: 0.965, green: 0.935, blue: 0.895, alpha: 1) }),
                 Color(uiColor: UIColor { t in t.userInterfaceStyle == .dark
                     ? UIColor(red: 0.28, green: 0.18, blue: 0.30, alpha: 1)
-                    : UIColor(red: 0.90, green: 0.89, blue: 0.98, alpha: 1) }),
+                    : UIColor(red: 0.945, green: 0.905, blue: 0.86, alpha: 1) }),
             ],
             startPoint: .top, endPoint: .bottom
         )
+    }
+
+    /// The board's container card + HUD pills — pure white in light mode, a soft
+    /// translucent panel in dark mode.
+    static var card: Color {
+        Color(uiColor: UIColor { t in t.userInterfaceStyle == .dark
+            ? UIColor(white: 1, alpha: 0.10)
+            : UIColor(white: 1, alpha: 1) })
     }
 }
 

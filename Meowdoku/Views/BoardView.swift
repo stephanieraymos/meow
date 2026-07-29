@@ -113,24 +113,16 @@ struct BoardView: View {
         let radius = cell * 0.24
 
         ZStack {
-            // Rounded pastel tile with a top-to-bottom depth gradient (light sheen
-            // up top, gentle shade at the base) — the cozy, gradient-filled look.
+            // Flat, solid pastel tile on the cream board — the original's clean,
+            // gap-separated look (a whisper of top sheen, no heavy depth gradient).
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(isFault ? Color(red: 0.94, green: 0.42, blue: 0.42) : palette.color(region))
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .fill(LinearGradient(stops: [
-                            .init(color: .white.opacity(0.38), location: 0),
-                            .init(color: .white.opacity(0.0), location: 0.48),
-                            .init(color: .black.opacity(0.07), location: 1),
-                        ], startPoint: .top, endPoint: .bottom))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.22), lineWidth: 0.75)
+                        .fill(LinearGradient(colors: [.white.opacity(0.14), .clear],
+                                             startPoint: .top, endPoint: .center))
                 )
                 .padding(inset)
-                .shadow(color: .black.opacity(0.10), radius: 1.5, y: 1)
 
             switch mark {
             case .cat:
