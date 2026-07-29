@@ -41,7 +41,9 @@ private struct GameBoardScreen: View {
         self.onReplay = onReplay
         self.onNext = onNext
         self.onExit = onExit
-        let board = PuzzleGenerator.generate(seed: mode.seed, size: mode.size)
+        let board = mode.difficultyTarget.map {
+            PuzzleGenerator.generate(seed: mode.seed, size: mode.size, target: $0)
+        } ?? PuzzleGenerator.generate(seed: mode.seed, size: mode.size)
         let palette = PlayerProfile.shared.palette
         _session = StateObject(wrappedValue: GameSession(board: board,
                                                          allowedMistakes: mode.allowedMistakes,

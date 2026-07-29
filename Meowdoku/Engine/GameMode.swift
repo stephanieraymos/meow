@@ -17,20 +17,26 @@ struct GameMode: Equatable {
     var showsTimer: Bool
     var title: String
     var subtitle: String
+    /// Target logical difficulty (0…1) for the generator to match, decoupled from
+    /// grid size. `nil` → a plain board without difficulty filtering (races /
+    /// tutorial, where both sides must reproduce the exact same seed).
+    var difficultyTarget: Double? = nil
 
     // MARK: - Builders
 
     static func daily(key: String) -> GameMode {
         GameMode(kind: .daily(key), size: DailyPuzzle.size, seed: DailyPuzzle.seed(for: key),
                  allowedMistakes: 3, hintsAllowed: true, showsTimer: true,
-                 title: "Daily Puzzle", subtitle: key)
+                 title: "Daily Puzzle", subtitle: key, difficultyTarget: 0.6)
     }
 
     static func level(_ index: Int) -> GameMode {
         let size = LevelCatalog.size(for: index)
         return GameMode(kind: .level(index), size: size, seed: LevelCatalog.seed(for: index),
                         allowedMistakes: 3, hintsAllowed: true, showsTimer: true,
-                        title: "Level \(index)", subtitle: "\(size)×\(size)")
+                        title: "Level \(index)",
+                        subtitle: "\(size)×\(size) · \(LevelCatalog.difficultyLabel(for: index))",
+                        difficultyTarget: LevelCatalog.difficultyTarget(for: index))
     }
 
     static func timeAttack(size: Int, seed: UInt64) -> GameMode {

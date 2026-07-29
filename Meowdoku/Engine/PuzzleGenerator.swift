@@ -11,6 +11,26 @@ import Foundation
 /// competing solution until only the intended one remains.
 enum PuzzleGenerator {
 
+    /// Generate a board whose *logical* difficulty (per `MeowSolver.gradeDifficulty`,
+    /// which is size-independent) best matches `target` (0…1). Deterministic: the
+    /// same `(seed, size, target)` always yields the same board. This is how a
+    /// level's difficulty is decoupled from its grid size — a small board can be
+    /// made hard and a large one easy by picking the right candidate.
+    static func generate(seed: UInt64, size: Int, target: Double, candidates: Int = 14) -> MeowBoard {
+        var best: MeowBoard?
+        var bestDelta = Double.greatestFiniteMagnitude
+        for i in 0..<max(1, candidates) {
+            // Deterministic per-candidate seed derived from the level seed.
+            var s = seed &+ (UInt64(i) &* 0x9E3779B97F4A7C15)
+            s ^= s >> 29; s = s &* 0xBF58476D1CE4E5B9; s ^= s >> 32; s |= 1
+            let board = generate(seed: s, size: size)
+            let delta = abs(MeowSolver.gradeDifficulty(regions: board.regions, size: size) - target)
+            if delta < bestDelta { bestDelta = delta; best = board }
+            if delta <= 0.06 { return board }   // close enough — stop early
+        }
+        return best ?? generate(seed: seed, size: size)
+    }
+
     static func generate(seed: UInt64, size: Int) -> MeowBoard {
         var rng = SeededGenerator(seed: seed)
 

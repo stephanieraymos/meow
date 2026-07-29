@@ -109,24 +109,28 @@ struct BoardView: View {
         let isRinged = spotlight == id || (isHighlight && hint?.kind != .testExclude)
         let dimmed = hint != nil && !isHighlight && !isTarget && spotlight != id
         let region = board.regionID(row: r, col: c)
-        let inset = cell * 0.045
-        let radius = cell * 0.20
+        let inset = cell * 0.05
+        let radius = cell * 0.24
 
         ZStack {
-            // Rounded tile with a soft top highlight for depth.
+            // Rounded pastel tile with a top-to-bottom depth gradient (light sheen
+            // up top, gentle shade at the base) — the cozy, gradient-filled look.
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .fill(isFault ? Color(red: 0.94, green: 0.35, blue: 0.33) : palette.color(region))
+                .fill(isFault ? Color(red: 0.94, green: 0.42, blue: 0.42) : palette.color(region))
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .fill(LinearGradient(colors: [.white.opacity(0.28), .white.opacity(0.02)],
-                                             startPoint: .top, endPoint: .center))
+                        .fill(LinearGradient(stops: [
+                            .init(color: .white.opacity(0.38), location: 0),
+                            .init(color: .white.opacity(0.0), location: 0.48),
+                            .init(color: .black.opacity(0.07), location: 1),
+                        ], startPoint: .top, endPoint: .bottom))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
-                        .strokeBorder(.black.opacity(0.10), lineWidth: 1)
+                        .strokeBorder(.white.opacity(0.22), lineWidth: 0.75)
                 )
                 .padding(inset)
-                .shadow(color: .black.opacity(0.12), radius: 1, y: 1)
+                .shadow(color: .black.opacity(0.10), radius: 1.5, y: 1)
 
             switch mark {
             case .cat:

@@ -39,7 +39,7 @@ final class PlayerProfile: ObservableObject {
         var tutorialSeen: Bool = false
         var remindersOn: Bool = false
         var appearance: String = "dark"
-        var paletteID: String = "classic"
+        var paletteID: String = "cozy"
 
         init() {}
 
@@ -67,7 +67,7 @@ final class PlayerProfile: ObservableObject {
             tutorialSeen = v(.tutorialSeen, false)
             remindersOn = v(.remindersOn, false)
             appearance = v(.appearance, "dark")
-            paletteID = v(.paletteID, "classic")
+            paletteID = v(.paletteID, "cozy")
         }
     }
 

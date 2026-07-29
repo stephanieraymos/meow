@@ -76,6 +76,15 @@ struct MeowPalette: Identifiable, Equatable {
 private func rgb(_ r: Double, _ g: Double, _ b: Double) -> Color { Color(red: r, green: g, blue: b) }
 
 enum MeowPalettes {
+    /// Soft, low-saturation pastels on the cozy end — matches the original
+    /// Meowdoku's calm, gradient-friendly look. The default.
+    static let cozy = MeowPalette(id: "cozy", name: "Cozy", colors: [
+        rgb(0.97, 0.71, 0.72), rgb(0.66, 0.83, 0.95), rgb(0.98, 0.89, 0.60),
+        rgb(0.80, 0.73, 0.96), rgb(0.68, 0.87, 0.70), rgb(0.97, 0.75, 0.88),
+        rgb(0.58, 0.84, 0.83), rgb(0.99, 0.79, 0.61), rgb(0.72, 0.76, 0.94),
+        rgb(0.80, 0.86, 0.66),
+    ])
+
     static let classic = MeowPalette(id: "classic", name: "Classic", colors: [
         rgb(0.96, 0.44, 0.42), rgb(0.16, 0.74, 0.76), rgb(0.98, 0.82, 0.30),
         rgb(0.62, 0.46, 0.94), rgb(0.38, 0.78, 0.44), rgb(0.98, 0.52, 0.82),
@@ -111,9 +120,9 @@ enum MeowPalettes {
         rgb(0.52, 0.36, 0.30),
     ])
 
-    static let all: [MeowPalette] = [classic, bright, neon, retro, dark]
+    static let all: [MeowPalette] = [cozy, classic, bright, neon, retro, dark]
 
     static func palette(_ id: String) -> MeowPalette {
-        all.first { $0.id == id } ?? classic
+        all.first { $0.id == id } ?? cozy
     }
 }

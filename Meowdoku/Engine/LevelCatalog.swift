@@ -6,20 +6,53 @@ import Foundation
 enum LevelCatalog {
     static let totalLevels = 240
 
-    /// Size bands: eased in (6×6), the bulk at 8×8, a hard tail at 10×10.
-    static func size(for level: Int) -> Int {
-        switch level {
-        case ..<60:  return 6
-        case ..<160: return 8
-        default:     return 10
-        }
+    /// A small deterministic hash, used to vary size without correlating to level.
+    private static func hash(_ x: UInt64) -> UInt64 {
+        var s = x &+ 0x9E3779B97F4A7C15
+        s = (s ^ (s >> 30)) &* 0xBF58476D1CE4E5B9
+        s = (s ^ (s >> 27)) &* 0x94D049BB133111EB
+        return s ^ (s >> 31)
     }
 
-    static func difficulty(for level: Int) -> Difficulty {
-        switch size(for: level) {
-        case 6:  return .easy
-        case 8:  return .normal
-        default: return .hard
+    /// Grid size for a level. **Deliberately decorrelated from difficulty** — the
+    /// original Meowdoku mixes big and small boards throughout, and size alone
+    /// doesn't make a puzzle harder. Consecutive levels vary a lot (5×5 → 10×10),
+    /// with the first few eased in so a new player isn't dropped onto a 10×10.
+    static func size(for level: Int) -> Int {
+        if level <= 3 { return 5 }
+        if level <= 6 { return 6 }
+        let h = hash(UInt64(level) &* 2_654_435_761)
+        // Onboarding (≤18): small but varied, so the first hour stays gentle while
+        // still changing box count. After that: full variation, decorrelated from
+        // difficulty (a big board can be easy, a small one brutal — the generator's
+        // difficulty match decides hardness, not the size).
+        if level <= 18 {
+            let pool = [5, 6, 6, 7, 7]
+            return pool[Int(h % UInt64(pool.count))]
+        }
+        let pool = [5, 6, 6, 7, 7, 8, 8, 8, 9, 9, 10, 10]
+        return pool[Int(h % UInt64(pool.count))]
+    }
+
+    /// Target *logical* difficulty (0…1) for a level, fed to the generator's
+    /// difficulty-matching. Rises monotonically with level — independent of grid
+    /// size — so the campaign genuinely gets harder as it goes, whether the board
+    /// is big or small. Eased so early levels stay gentle and the top plateaus hard.
+    static func difficultyTarget(for level: Int) -> Double {
+        let span = 170.0
+        let t = min(1.0, max(0.0, Double(level - 1) / span))
+        let eased = t * t * (3 - 2 * t)          // smoothstep
+        return 0.12 + 0.83 * eased               // 0.12 (gentle) → 0.95 (expert)
+    }
+
+    /// Human-readable difficulty tier for a level, derived from the target (for
+    /// level-select badges). Not tied to grid size.
+    static func difficultyLabel(for level: Int) -> String {
+        switch difficultyTarget(for: level) {
+        case ..<0.30: return "Easy"
+        case ..<0.55: return "Medium"
+        case ..<0.78: return "Hard"
+        default:      return "Expert"
         }
     }
 
