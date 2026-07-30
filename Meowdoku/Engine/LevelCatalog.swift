@@ -39,10 +39,12 @@ enum LevelCatalog {
     /// size — so the campaign genuinely gets harder as it goes, whether the board
     /// is big or small. Eased so early levels stay gentle and the top plateaus hard.
     static func difficultyTarget(for level: Int) -> Double {
-        let span = 170.0
-        let t = min(1.0, max(0.0, Double(level - 1) / span))
-        let eased = t * t * (3 - 2 * t)          // smoothstep
-        return 0.12 + 0.83 * eased               // 0.12 (gentle) → 0.95 (expert)
+        // Climbs out of the gentle onboarding FAST so the 30s–50s already feel
+        // medium/hard (the earlier smoothstep left the 30s too easy), reaching
+        // expert by ~level 120. Concave (pow < 1) = quick early rise, then plateau.
+        let t = min(1.0, max(0.0, Double(level - 1) / 130.0))
+        let eased = pow(t, 0.72)
+        return 0.15 + 0.80 * eased               // 0.15 (gentle) → 0.95 (expert)
     }
 
     /// Human-readable difficulty tier for a level, derived from the target (for
