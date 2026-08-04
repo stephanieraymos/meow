@@ -35,6 +35,25 @@ if ! grep -qrl "$PROFILE_NAME" "$HOME/Library/MobileDevice/Provisioning Profiles
 fi
 
 echo "▶  Regenerating Xcode project..."
+# --- Marketing version bump ------------------------------------------------
+# Auto-bumps the PATCH each ship (1.0.0 -> 1.0.1). Override per run:
+#   BUMP=minor  ./scripts/upload-testflight.sh   -> 1.1.0
+#   BUMP=major  ./scripts/upload-testflight.sh   -> 2.0.0
+#   VERSION=1.4.2 ./scripts/upload-testflight.sh -> sets it exactly
+# Written into project.yml BEFORE xcodegen so the archive carries it. The value
+# climbs from whatever is committed — commit project.yml to persist the bump.
+VERSION_KEY="MARKETING_VERSION"
+grep -q "MARKETING_VERSION:" project.yml || VERSION_KEY="CFBundleShortVersionString"
+CUR_VER=$( (grep -m1 "${VERSION_KEY}:" project.yml || true) | sed -E 's/.*: *"?([0-9]+(\.[0-9]+)*)"?.*/\1/')
+CUR_VER=${CUR_VER:-1.0.0}
+IFS=. read -r _MAJ _MIN _PAT <<<"$CUR_VER"; _MAJ=${_MAJ:-1}; _MIN=${_MIN:-0}; _PAT=${_PAT:-0}
+if   [ -n "${VERSION:-}" ];        then NEW_VER="$VERSION"
+elif [ "${BUMP:-patch}" = major ]; then NEW_VER="$((_MAJ+1)).0.0"
+elif [ "${BUMP:-patch}" = minor ]; then NEW_VER="${_MAJ}.$((_MIN+1)).0"
+else                                    NEW_VER="${_MAJ}.${_MIN}.$((_PAT+1))"; fi
+sed -i '' -E "s/(${VERSION_KEY}: *\")[0-9][0-9.]*(\")/\1${NEW_VER}\2/g" project.yml
+echo "▶  Marketing version ${CUR_VER} → ${NEW_VER}"
+# ---------------------------------------------------------------------------
 xcodegen generate >/dev/null
 
 BUILD_NUMBER=$(date +%s)
