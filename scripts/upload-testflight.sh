@@ -91,3 +91,12 @@ xcrun altool --upload-app --type ios \
 
 echo ""
 echo "✅ Build $BUILD_NUMBER uploaded. Appears in TestFlight in ~5–10 min."
+
+# --- Persist the version bump (auto-commit project.yml after a successful ship) ---
+if ! git diff --quiet project.yml 2>/dev/null; then
+  git add project.yml \
+    && git commit -q -m "chore: release v${NEW_VER} (build ${BUILD_NUMBER})" \
+    && echo "▶  Committed version bump → v${NEW_VER}" \
+    || echo "⚠️  Couldn't commit the version bump — commit project.yml manually."
+fi
+# ---------------------------------------------------------------------------------
