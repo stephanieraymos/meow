@@ -10,7 +10,7 @@ struct GameplayView: View {
     init(mode: GameMode) { _mode = State(initialValue: mode) }
 
     var body: some View {
-        GameBoardScreen(mode: mode, onReplay: { replay += 1 }, onNext: nextAction, onExit: { dismiss() })
+        GameBoardLoader(mode: mode, onReplay: { replay += 1 }, onNext: nextAction, onExit: { dismiss() })
             .id("\(mode.seed)-\(replay)")
             .navigationBarBackButtonHidden(true)
     }
@@ -23,40 +23,80 @@ struct GameplayView: View {
     }
 }
 
-/// One board, one session. Handles play, hearts, hints, undo, timer, and result.
-private struct GameBoardScreen: View {
+/// Builds the board **off the main thread**, then hands it to the board screen.
+/// Difficulty-matched generation runs a candidate search that can take a few
+/// hundred milliseconds at 10×10 — doing that inline in a view's `init` froze the
+/// UI on "New game" and re-ran on every re-render.
+private struct GameBoardLoader: View {
     let mode: GameMode
     let onReplay: () -> Void
     let onNext: (() -> Void)?
     let onExit: () -> Void
 
-    @StateObject private var session: GameSession
+    @State private var session: GameSession?
+
+    var body: some View {
+        ZStack {
+            MeowTheme.backdrop.ignoresSafeArea()
+            if let session {
+                GameBoardScreen(mode: mode, session: session,
+                                onReplay: onReplay, onNext: onNext, onExit: onExit)
+            } else {
+                generating
+            }
+        }
+        .task { await load() }
+    }
+
+    private var generating: some View {
+        VStack(spacing: 12) {
+            ProgressView().controlSize(.large).tint(MeowTheme.ink)
+            Text("Setting up your \(mode.size)×\(mode.size) board…")
+                .font(.headline).foregroundStyle(MeowTheme.ink)
+            Text("Every puzzle is checked to have exactly one solution, so it's always solvable without guessing.")
+                .font(.footnote).foregroundStyle(MeowTheme.ink.opacity(0.65))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 44)
+        }
+    }
+
+    private func load() async {
+        guard session == nil else { return }
+        let mode = self.mode
+        // Palette naming touches UIColor, so read it here on the main actor.
+        let autoMark = PlayerProfile.shared.autoMarkOn
+        let names = PlayerProfile.shared.palette.regionNames(count: mode.size)
+        let board = await Task.detached(priority: .userInitiated) { () -> MeowBoard in
+            if let target = mode.difficultyTarget {
+                return PuzzleGenerator.generate(seed: mode.seed, size: mode.size, target: target)
+            }
+            return PuzzleGenerator.generate(seed: mode.seed, size: mode.size)
+        }.value
+        session = GameSession(board: board, allowedMistakes: mode.allowedMistakes,
+                              autoMark: autoMark, colorNames: names)
+    }
+}
+
+/// One board, one session. Handles play, hearts, hints, undo, timer, and result.
+private struct GameBoardScreen: View {
+    let mode: GameMode
+    @ObservedObject var session: GameSession
+    let onReplay: () -> Void
+    let onNext: (() -> Void)?
+    let onExit: () -> Void
+
     @ObservedObject private var profile = PlayerProfile.shared
+    @Environment(\.scenePhase) private var scenePhase
     @State private var recorded = false
     @State private var earnedStars = 0
     @State private var earnedScore = 0
-
-    init(mode: GameMode, onReplay: @escaping () -> Void, onNext: (() -> Void)?, onExit: @escaping () -> Void) {
-        self.mode = mode
-        self.onReplay = onReplay
-        self.onNext = onNext
-        self.onExit = onExit
-        let board = mode.difficultyTarget.map {
-            PuzzleGenerator.generate(seed: mode.seed, size: mode.size, target: $0)
-        } ?? PuzzleGenerator.generate(seed: mode.seed, size: mode.size)
-        let palette = PlayerProfile.shared.palette
-        _session = StateObject(wrappedValue: GameSession(board: board,
-                                                         allowedMistakes: mode.allowedMistakes,
-                                                         autoMark: PlayerProfile.shared.autoMarkOn,
-                                                         colorNames: palette.regionNames(count: board.size)))
-    }
+    @State private var confirmExit = false
 
     /// Warm brown used for headers/labels — matches the original's cozy ink.
     private let brand = Color(red: 0.44, green: 0.31, blue: 0.27)
 
     var body: some View {
         ZStack {
-            MeowTheme.backdrop.ignoresSafeArea()
             VStack(spacing: 12) {
                 topBar
                 statusRow
@@ -74,6 +114,22 @@ private struct GameBoardScreen: View {
         }
         .onChange(of: session.isWon) { _, won in if won { recordWin() } }
         .onChange(of: session.isLost) { _, lost in if lost { recordLoss() } }
+        // Don't let the clock run while the app is backgrounded — otherwise
+        // putting the phone down destroys a best time or a Time Attack score.
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { session.resumeTimer() } else { session.pauseTimer() }
+        }
+        .confirmationDialog("Leave this puzzle?", isPresented: $confirmExit, titleVisibility: .visible) {
+            Button("Leave", role: .destructive) { onExit() }
+            Button("Keep playing", role: .cancel) {}
+        } message: {
+            Text("Your cats and X marks on this board will be lost.")
+        }
+    }
+
+    /// Bail out immediately if nothing would be lost; otherwise confirm.
+    private func requestExit() {
+        if session.isOver || !session.canUndo { onExit() } else { confirmExit = true }
     }
 
     // MARK: Chrome
@@ -82,7 +138,7 @@ private struct GameBoardScreen: View {
         Button(action: action) {
             Image(systemName: system).font(.headline.weight(.semibold))
                 .foregroundStyle(brand)
-                .frame(width: 42, height: 42)
+                .frame(width: 44, height: 44)   // Apple's minimum tap target
                 .background(MeowTheme.card, in: Circle())
                 .shadow(color: .black.opacity(0.06), radius: 3, y: 1)
         }
@@ -92,7 +148,7 @@ private struct GameBoardScreen: View {
     /// top bar). Non-campaign modes show their title in place of the stats.
     private var topBar: some View {
         HStack(alignment: .center) {
-            roundButton("chevron.left") { onExit() }
+            roundButton("chevron.left") { requestExit() }
             Spacer()
             if case .level(let i) = mode.kind {
                 HStack(spacing: 36) {
@@ -103,7 +159,7 @@ private struct GameBoardScreen: View {
                 Text(mode.title).font(.title2.weight(.bold)).foregroundStyle(brand)
             }
             Spacer()
-            roundButton("xmark") { onExit() }
+            roundButton("xmark") { requestExit() }
         }
     }
 

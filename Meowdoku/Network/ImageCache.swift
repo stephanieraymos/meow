@@ -83,8 +83,13 @@ struct CachedAvatar: View {
         return (first + last).uppercased()
     }
 
+    /// Stable across launches (Swift's `hashValue` is re-seeded per process, so
+    /// it would repaint everyone a new color each time) and overflow-safe
+    /// (`abs(Int.min)` traps).
     private var fallbackColor: Color {
-        let hash = abs(name.hashValue)
-        return MeowPalettes.classic.colors[hash % MeowPalettes.classic.colors.count]
+        var hash: UInt64 = 1469598103934665603   // FNV-1a
+        for byte in name.utf8 { hash ^= UInt64(byte); hash = hash &* 1099511628211 }
+        let palette = MeowPalettes.classic.colors
+        return palette[Int(hash % UInt64(palette.count))]
     }
 }

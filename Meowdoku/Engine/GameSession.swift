@@ -67,6 +67,10 @@ final class GameSession: ObservableObject {
     var colorNames: [String] = []
     let startedAt = Date()
     private(set) var finishedAt: Date?
+    /// Wall-clock time spent with the app backgrounded, excluded from `elapsed`
+    /// so putting the phone down doesn't wreck a best time or a Time Attack run.
+    private var pausedAt: Date?
+    private var pausedTotal: TimeInterval = 0
 
     struct Cell: Equatable { let row: Int; let col: Int }
     private struct Move { let row: Int; let col: Int; let before: CellMark }
@@ -91,9 +95,23 @@ final class GameSession: ObservableObject {
     var progress: Int { correctCats }
     var heartsRemaining: Int { max(0, allowedMistakes - mistakes) }
     var canUndo: Bool { !isOver && !undoStack.isEmpty }
-    var elapsed: TimeInterval { (finishedAt ?? Date()).timeIntervalSince(startedAt) }
+    var elapsed: TimeInterval {
+        max(0, (finishedAt ?? pausedAt ?? Date()).timeIntervalSince(startedAt) - pausedTotal)
+    }
 
     func mark(row: Int, col: Int) -> CellMark { marks[row][col] }
+
+    /// Stop the clock while the app is backgrounded / inactive.
+    func pauseTimer() {
+        guard !isOver, pausedAt == nil else { return }
+        pausedAt = Date()
+    }
+
+    func resumeTimer() {
+        guard let started = pausedAt else { return }
+        pausedTotal += Date().timeIntervalSince(started)
+        pausedAt = nil
+    }
 
     // MARK: - Interactions
 
@@ -129,6 +147,7 @@ final class GameSession: ObservableObject {
 
         // Wrong placement — a mistake.
         mistakes += 1
+        let before = marks[row][col]   // restore the player's X note afterwards
         marks[row][col] = .cat
         faultCell = Cell(row: row, col: col)
         Haptics.error()
@@ -136,7 +155,7 @@ final class GameSession: ObservableObject {
         if mistakes >= allowedMistakes {
             lose()                // leave the offending cat on the board, flashed red
         } else {
-            scheduleFaultClear(row: row, col: col)
+            scheduleFaultClear(row: row, col: col, restoring: before)
         }
         return .mistake
     }
@@ -180,10 +199,13 @@ final class GameSession: ObservableObject {
     @discardableResult
     func hint() -> Hint? {
         guard !isOver else { return nil }
-        // Candidate = an empty square that could still hold a cat given the cats
-        // already placed (ignores the player's own X notes).
+        // Candidate = a square that could still hold a cat given the cats already
+        // placed. This deliberately ignores the player's own X notes: a hint has
+        // to reason from the board's truth, or one mistaken X would make every
+        // later hint confidently wrong. Targets are filtered to empty squares
+        // separately, so "Apply" still only ever adds new X's.
         var possible = [[Bool]](repeating: [Bool](repeating: false, count: size), count: size)
-        for r in 0..<size { for c in 0..<size { possible[r][c] = marks[r][c] == .empty && canHoldCat(r, c) } }
+        for r in 0..<size { for c in 0..<size { possible[r][c] = canHoldCat(r, c) } }
 
         // Simplest (most teachable) exclusions first, then the contradiction test,
         // then the more abstract locked/naked deductions.
@@ -221,7 +243,7 @@ final class GameSession: ObservableObject {
     /// one, a cat can't go in that candidate — so it must be an "X". This is the
     /// "?"-cat hint: the tested square with the doomed line highlighted.
     private func contradictionExclusion(_ possible: [[Bool]]) -> Hint? {
-        for r in 0..<size { for c in 0..<size where possible[r][c] {
+        for r in 0..<size { for c in 0..<size where possible[r][c] && marks[r][c] == .empty {
             let hereRegion = board.regionID(row: r, col: c)
 
             for tr in 0..<size where tr != r && rowCat(tr) == nil {
@@ -257,17 +279,24 @@ final class GameSession: ObservableObject {
         return abs(cell.row - catAt.r) <= 1 && abs(cell.col - catAt.c) <= 1
     }
 
+    /// True where a cat is really placed. The transient red "fault" cat left by a
+    /// wrong tap is excluded — it vanishes in half a second, and reasoning from
+    /// it would produce a hint that is simply wrong.
+    private func hasCat(_ r: Int, _ c: Int) -> Bool {
+        marks[r][c] == .cat && faultCell != Cell(row: r, col: c)
+    }
+
     /// A square can still hold a cat only if no placed cat shares its row, column
     /// or color, or touches it.
     private func canHoldCat(_ r: Int, _ c: Int) -> Bool {
-        if marks[r][c] == .cat { return false }
-        for i in 0..<size where marks[r][i] == .cat { return false }
-        for i in 0..<size where marks[i][c] == .cat { return false }
+        if hasCat(r, c) { return false }
+        for i in 0..<size where hasCat(r, i) { return false }
+        for i in 0..<size where hasCat(i, c) { return false }
         let region = board.regionID(row: r, col: c)
-        for rr in 0..<size { for cc in 0..<size where marks[rr][cc] == .cat && board.regionID(row: rr, col: cc) == region { return false } }
+        for rr in 0..<size { for cc in 0..<size where hasCat(rr, cc) && board.regionID(row: rr, col: cc) == region { return false } }
         for dr in -1...1 { for dc in -1...1 {
             let nr = r + dr, nc = c + dc
-            if nr >= 0, nr < size, nc >= 0, nc < size, marks[nr][nc] == .cat { return false }
+            if nr >= 0, nr < size, nc >= 0, nc < size, hasCat(nr, nc) { return false }
         } }
         return true
     }
@@ -293,7 +322,7 @@ final class GameSession: ObservableObject {
             for r in 0..<size { for c in 0..<size where board.regionID(row: r, col: c) == region && marks[r][c] == .empty { empties.append(Cell(row: r, col: c)) } }
             consider(empties, [regionCat(region)!], "A cat can't go in these — \(catPhrase(region)) is already placed.")
         }
-        for r in 0..<size { for c in 0..<size where marks[r][c] == .cat {
+        for r in 0..<size { for c in 0..<size where hasCat(r, c) {
             var neighbours: [Cell] = []
             for dr in -1...1 { for dc in -1...1 where !(dr == 0 && dc == 0) {
                 let nr = r + dr, nc = c + dc
@@ -314,7 +343,7 @@ final class GameSession: ObservableObject {
             guard let first = cells.first else { continue }
             if cells.allSatisfy({ $0.row == first.row }) {
                 let r = first.row
-                let targets = (0..<size).compactMap { c in possible[r][c] && board.regionID(row: r, col: c) != region ? Cell(row: r, col: c) : nil }
+                let targets = (0..<size).compactMap { c in possible[r][c] && marks[r][c] == .empty && board.regionID(row: r, col: c) != region ? Cell(row: r, col: c) : nil }
                 if !targets.isEmpty {
                     return set(.init(kind: .exclude, highlight: cells, targets: targets,
                                      reason: "\(catPhrase(region).capitalizedFirst) can only go in row \(r + 1), so no other cat can take that row."))
@@ -322,7 +351,7 @@ final class GameSession: ObservableObject {
             }
             if cells.allSatisfy({ $0.col == first.col }) {
                 let c = first.col
-                let targets = (0..<size).compactMap { r in possible[r][c] && board.regionID(row: r, col: c) != region ? Cell(row: r, col: c) : nil }
+                let targets = (0..<size).compactMap { r in possible[r][c] && marks[r][c] == .empty && board.regionID(row: r, col: c) != region ? Cell(row: r, col: c) : nil }
                 if !targets.isEmpty {
                     return set(.init(kind: .exclude, highlight: cells, targets: targets,
                                      reason: "\(catPhrase(region).capitalizedFirst) can only go in column \(c + 1), so no other cat can take that column."))
@@ -353,7 +382,7 @@ final class GameSession: ObservableObject {
                 guard union.count == k else { continue }
                 let comboSet = Set(combo)
                 var targets: [Cell] = []
-                for r in 0..<size { for c in 0..<size where possible[r][c] {
+                for r in 0..<size { for c in 0..<size where possible[r][c] && marks[r][c] == .empty {
                     if union.contains(byColumn ? c : r), !comboSet.contains(board.regionID(row: r, col: c)) { targets.append(Cell(row: r, col: c)) }
                 } }
                 if !targets.isEmpty {
@@ -383,10 +412,10 @@ final class GameSession: ObservableObject {
         return nil
     }
 
-    private func rowCat(_ r: Int) -> Cell? { for c in 0..<size where marks[r][c] == .cat { return Cell(row: r, col: c) }; return nil }
-    private func colCat(_ c: Int) -> Cell? { for r in 0..<size where marks[r][c] == .cat { return Cell(row: r, col: c) }; return nil }
+    private func rowCat(_ r: Int) -> Cell? { for c in 0..<size where hasCat(r, c) { return Cell(row: r, col: c) }; return nil }
+    private func colCat(_ c: Int) -> Cell? { for r in 0..<size where hasCat(r, c) { return Cell(row: r, col: c) }; return nil }
     private func regionCat(_ region: Int) -> Cell? {
-        for r in 0..<size { for c in 0..<size where marks[r][c] == .cat && board.regionID(row: r, col: c) == region { return Cell(row: r, col: c) } }
+        for r in 0..<size { for c in 0..<size where hasCat(r, c) && board.regionID(row: r, col: c) == region { return Cell(row: r, col: c) } }
         return nil
     }
     private func regionCells(_ region: Int) -> [Cell] {
@@ -492,13 +521,13 @@ final class GameSession: ObservableObject {
         correctCats = n
     }
 
-    private func scheduleFaultClear(row: Int, col: Int) {
+    private func scheduleFaultClear(row: Int, col: Int, restoring before: CellMark) {
         faultToken += 1
         let token = faultToken
         Task { [weak self] in
             try? await Task.sleep(nanoseconds: 550_000_000)
             guard let self, self.faultToken == token, !self.isOver else { return }
-            if self.marks[row][col] == .cat { self.marks[row][col] = .empty }
+            if self.marks[row][col] == .cat { self.marks[row][col] = (before == .cat ? .empty : before) }
             self.faultCell = nil
         }
     }

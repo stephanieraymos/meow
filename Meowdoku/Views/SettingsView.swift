@@ -5,8 +5,11 @@ struct SettingsView: View {
     @ObservedObject private var profile = PlayerProfile.shared
     @State private var showGameCenter = false
     @State private var players: [MeowPlayer] = []
+    @State private var playersState: LoadState = .loading
     @AppStorage("meow_player_id") private var selectedID: String = ""
     private let styleColumns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 5)
+
+    private enum LoadState { case loading, loaded, failed }
 
     var body: some View {
         ZStack {
@@ -14,10 +17,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
                     section("You are") {
-                        if players.isEmpty {
-                            Text("Pick who you are so your progress syncs to the cloud and survives reinstalls.")
-                                .font(.caption).foregroundStyle(MeowTheme.ink.opacity(0.6))
-                        }
+                        playersStatus
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 14) {
                                 ForEach(players) { p in
@@ -148,8 +148,38 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
-        .task { if players.isEmpty { players = (try? await MeowAPI.fetchPlayers()) ?? [] } }
+        .task {
+            guard players.isEmpty else { return }
+            playersState = .loading
+            do {
+                players = try await MeowAPI.fetchPlayers()
+                playersState = .loaded
+            } catch {
+                playersState = .failed
+            }
+        }
         .sheet(isPresented: $showGameCenter) { GameCenterDashboard().ignoresSafeArea() }
+    }
+
+    /// Never leave the picker blank without saying why it's blank.
+    @ViewBuilder private var playersStatus: some View {
+        let caption = MeowTheme.ink.opacity(0.6)
+        switch playersState {
+        case .loading where players.isEmpty:
+            HStack(spacing: 8) {
+                ProgressView().tint(MeowTheme.ink)
+                Text("Loading players…").font(.caption).foregroundStyle(caption)
+            }
+        case .failed:
+            Text("Couldn't reach the server, so there's nobody to pick yet. Check your connection and reopen Settings — you can still play offline.")
+                .font(.caption).foregroundStyle(caption)
+        case .loaded where players.isEmpty:
+            Text("No players have been set up for this game yet, so there's nobody to pick.")
+                .font(.caption).foregroundStyle(caption)
+        default:
+            Text("Pick who you are so your progress syncs to the cloud and survives reinstalls.")
+                .font(.caption).foregroundStyle(caption)
+        }
     }
 
     @ViewBuilder private func section(_ title: String, @ViewBuilder _ content: () -> some View) -> some View {
