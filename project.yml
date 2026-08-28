@@ -7,6 +7,13 @@ options:
 
 settings:
   base:
+    # Version rule — the bump must match the size of the change:
+    #   BUMP=major  (2.0.0)  tab-structure change, redesign, a whole new pillar feature
+    #   BUMP=minor  (1.1.0)  a medium feature — new screen, new capability
+    #   (default)   (1.0.1)  small features, bug fixes, polish
+    # `BUMP=minor make ship`. The default is PATCH, so a real feature ships looking
+    # like a bug fix unless you say otherwise. Largest change in the ship decides.
+    # Only the iOS script bumps; ship-mac reuses the version it wrote.
     MARKETING_VERSION: "1.0.1"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
