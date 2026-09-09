@@ -1,11 +1,26 @@
 # Meow — Meowdoku puzzle game (iOS)
 
-**Read this first; it is loaded automatically because it lives in the repo.** The
-long-form docs live in iCloud and are NOT auto-loaded — open them when the task is
-architectural rather than a small change:
+**Read this first; it is loaded automatically because it lives in the repo. It is a
+pointer, not the documentation.**
 
-- `Cowork OS/Projects/Meow/CLAUDE.md` — architecture, features, design rules
-- `Cowork OS/Projects/Meow/MEMORY.md` — current status, decisions, backlog
+## Read these before you start, and write back to them as you finish
+
+The real project documentation lives in iCloud and is NOT auto-loaded. Open both
+before anything beyond a trivial change:
+
+| Document | Path |
+| :-- | :-- |
+| Workstation brief — architecture, features, design rules | `Cowork OS/Projects/Meow/CLAUDE.md` |
+| Living status — current state, decisions, backlog | `Cowork OS/Projects/Meow/MEMORY.md` |
+| Plan — phases and rationale, where one exists | `Cowork OS/Projects/Meow/plan.md` |
+
+**Update MEMORY.md as each piece of work finishes, not at the end of the session.**
+A session that is interrupted or runs out of context takes undocumented work with
+it, and the next one starts from a status line that is already wrong. Write an entry
+the moment a feature lands, a decision is made, or something here turns out to be
+stale: what changed, and why it was done that way. Keep the `*Last updated:*` line at
+the top of MEMORY.md current, and correct the workstation CLAUDE.md whenever the code
+and the doc disagree — the code is the truth, the doc is what the next session reads.
 
 `Cowork OS` = `~/Library/Mobile Documents/com~apple~CloudDocs/Cowork OS`.
 
